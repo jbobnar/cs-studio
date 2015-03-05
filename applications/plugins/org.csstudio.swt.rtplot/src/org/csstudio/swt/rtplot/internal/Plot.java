@@ -109,11 +109,12 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
     final private AxisPart<XTYPE> x_axis;
     final private List<YAxisImpl<XTYPE>> y_axes = new CopyOnWriteArrayList<>();
     final private PlotPart plot_area;
-    final private TracePainter<XTYPE> trace_painter = new TracePainter<XTYPE>();
     final private List<AnnotationImpl<XTYPE>> annotations = new CopyOnWriteArrayList<>();
     final private List<TimestampImpl<XTYPE>> timestamps = new CopyOnWriteArrayList<>();
 
     final private PlotProcessor<XTYPE> plot_processor;
+    
+    private TracePainter<XTYPE> trace_painter = new TracePainter<XTYPE>();
 
     final private Runnable redraw_runnable = () ->
     {
@@ -189,7 +190,7 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
     public Plot(final Composite parent, final Class<XTYPE> type)
     {
         super(parent, SWT.NO_BACKGROUND);
-
+        
         label_font = parent.getFont();
         scale_font = parent.getFont();
 
@@ -494,6 +495,7 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
         }
     }
     
+    /** @param annotation Timestamp to add */
     @SuppressWarnings({ "unchecked", "rawtypes" })
 	public void addTimestamp(final Timestamp<XTYPE> timestamp) {
     	Objects.requireNonNull(timestamp);
@@ -504,15 +506,25 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
     	requestUpdate();
     }
     
+    /** @return Current {@link TimestampImpl}s */
     public List<TimestampImpl<XTYPE>> getTimestamps() {
     	return timestamps;
     }
     
+    /** @param timestamp Timestamp to remove */
     public void removeTimestamp(final Timestamp<XTYPE> timestamp) {
     	timestamps.remove(timestamp);
         requestUpdate();
     }
     
+    /**
+     * Update timestamp position.
+     * 
+     * @param timestamp {@link Timestamp} to update.
+     *        Must be an existing timestamp obtained from <code>getTimestamps()</code>
+     * @param position new timestamp position
+     * @throws IllegalArgumentException if timestamp is unknown
+     */
     public void updateTimestamp(final Timestamp<XTYPE> timestamp, final XTYPE position) {
     	final int index = timestamps.indexOf(timestamp);
         if (index < 0)
@@ -522,10 +534,6 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
         fireAnnotationsChanged();
     }
     
-    public Rectangle getPlotPartBounds() {
-    	return plot_area.getBounds();
-    }
-
     /** Compute layout of plot components */
     private void computeLayout(final GC gc, final Rectangle bounds)
     {
@@ -1109,6 +1117,20 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
     public void stagger()
     {
         plot_processor.stagger();
+    }
+    
+    /** @return true if smart trace painting is enabled, otherwise false */
+    public boolean isSmartTracePainting() {
+    	return trace_painter instanceof SmartTracePainter;
+    }
+    
+    /** @param isSmartTracePainting smart trace painting */
+    public void setSmartTracePainting(boolean isSmartTracePainting) {
+    	if (isSmartTracePainting) {
+    		trace_painter = new SmartTracePainter<XTYPE>();
+    	} else {
+    		trace_painter = new TracePainter<XTYPE>();
+    	}
     }
 
     /** Notify listeners */

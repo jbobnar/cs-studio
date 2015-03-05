@@ -28,7 +28,6 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.FontData;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.RGB;
-import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.layout.FormLayout;
@@ -330,19 +329,35 @@ public class RTPlot<XTYPE extends Comparable<XTYPE>> extends Composite
         plot.removeAnnotation(annotation);
     }
     
+    /** @param timestamp Timestamp to add */
     public void addTimestamp(final Timestamp<XTYPE> timestamp) {
     	plot.addTimestamp(timestamp);
     }
     
+    /** @return Current {@link TimestampImpl}s */
     public List<Timestamp<XTYPE>> getTimestamps() {
     	return Collections.unmodifiableList(plot.getTimestamps());
     }
     
+    /**
+     * Update timestamp position.
+     * 
+     * @param timestamp {@link Timestamp} to update.
+     *        Must be an existing timestamp obtained from <code>getTimestamps()</code>
+     * @param position new timestamp position
+     * @throws IllegalArgumentException if timestamp is unknown
+     */
     public void updateTimestamp(final Timestamp<XTYPE> timestamp, final XTYPE position) {
     	plot.updateTimestamp(timestamp, position);
     }
     
-    public Rectangle getPlotPartBounds() {
-    	return plot.getPlotPartBounds();
+    /** @return true if smart trace painting is enabled, otherwise false */
+    public boolean isSmartTracePainting() {
+    	return plot.isSmartTracePainting();
+    }
+    
+    /** @param isSmartTracePainting smart trace painting */
+    public void setSmartTracePainting(boolean isSmartTracePainting) {
+    	plot.setSmartTracePainting(isSmartTracePainting);
     }
 }
