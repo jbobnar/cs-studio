@@ -28,6 +28,7 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.FontData;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.RGB;
+import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.layout.FormLayout;
@@ -327,5 +328,21 @@ public class RTPlot<XTYPE extends Comparable<XTYPE>> extends Composite
     public void removeAnnotation(final Annotation<XTYPE> annotation)
     {
         plot.removeAnnotation(annotation);
+    }
+    
+    public void addTimestamp(final Timestamp<XTYPE> timestamp) {
+    	plot.addTimestamp(timestamp);
+    }
+    
+    public List<Timestamp<XTYPE>> getTimestamps() {
+    	return Collections.unmodifiableList(plot.getTimestamps());
+    }
+    
+    public void updateTimestamp(final Timestamp<XTYPE> timestamp, final XTYPE position) {
+    	plot.updateTimestamp(timestamp, position);
+    }
+    
+    public Rectangle getPlotPartBounds() {
+    	return plot.getPlotPartBounds();
     }
 }

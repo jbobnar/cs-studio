@@ -25,6 +25,7 @@ import org.csstudio.swt.rtplot.AxisRange;
 import org.csstudio.swt.rtplot.Messages;
 import org.csstudio.swt.rtplot.PlotListener;
 import org.csstudio.swt.rtplot.SWTMediaPool;
+import org.csstudio.swt.rtplot.Timestamp;
 import org.csstudio.swt.rtplot.Trace;
 import org.csstudio.swt.rtplot.YAxis;
 import org.csstudio.swt.rtplot.data.PlotDataItem;
@@ -110,6 +111,7 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
     final private PlotPart plot_area;
     final private TracePainter<XTYPE> trace_painter = new TracePainter<XTYPE>();
     final private List<AnnotationImpl<XTYPE>> annotations = new CopyOnWriteArrayList<>();
+    final private List<TimestampImpl<XTYPE>> timestamps = new CopyOnWriteArrayList<>();
 
     final private PlotProcessor<XTYPE> plot_processor;
 
@@ -491,6 +493,38 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
             requestUpdate();
         }
     }
+    
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+	public void addTimestamp(final Timestamp<XTYPE> timestamp) {
+    	Objects.requireNonNull(timestamp);
+    	if (timestamp instanceof TimestampImpl)
+    		timestamps.add((TimestampImpl) timestamp);
+    	else
+    		timestamps.add(new TimestampImpl<XTYPE>(timestamp.getPosition()));
+    	requestUpdate();
+    }
+    
+    public List<TimestampImpl<XTYPE>> getTimestamps() {
+    	return timestamps;
+    }
+    
+    public void removeTimestamp(final Timestamp<XTYPE> timestamp) {
+    	timestamps.remove(timestamp);
+        requestUpdate();
+    }
+    
+    public void updateTimestamp(final Timestamp<XTYPE> timestamp, final XTYPE position) {
+    	final int index = timestamps.indexOf(timestamp);
+        if (index < 0)
+            throw new IllegalArgumentException("Unknown timestamp " + timestamp);
+        timestamps.get(index).setPosition(position);
+        requestUpdate();
+        fireAnnotationsChanged();
+    }
+    
+    public Rectangle getPlotPartBounds() {
+    	return plot_area.getBounds();
+    }
 
     /** Compute layout of plot components */
     private void computeLayout(final GC gc, final Rectangle bounds)
@@ -569,6 +603,10 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
         for (AnnotationImpl<XTYPE> annotation : annotations)
             annotation.paint(gc, media, x_axis, y_axes.get(annotation.getTrace().getYAxis()));
 
+        // Timestamps
+        for (TimestampImpl<XTYPE> timestamp : timestamps)
+        	timestamp.paint(gc, media, plot_area.getBounds(), x_axis);
+        
         gc.dispose();
 
         // Update image
