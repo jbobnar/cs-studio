@@ -9,23 +9,39 @@ package org.csstudio.trends.databrowser2.editor;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 import org.csstudio.apputil.ui.workbench.OpenViewAction;
 import org.csstudio.email.EMailSender;
+import org.csstudio.swt.rtplot.PointType;
+import org.csstudio.swt.rtplot.RTValuePlot;
+import org.csstudio.swt.rtplot.Timestamp;
+import org.csstudio.swt.rtplot.Trace;
+import org.csstudio.swt.rtplot.TraceType;
+import org.csstudio.swt.rtplot.data.PlotDataSearch;
 import org.csstudio.swt.rtplot.undo.UndoableActionManager;
 import org.csstudio.trends.databrowser2.Activator;
 import org.csstudio.trends.databrowser2.Messages;
 import org.csstudio.trends.databrowser2.Perspective;
+import org.csstudio.trends.databrowser2.archive.ArchiveFetchJob;
+import org.csstudio.trends.databrowser2.archive.ArchiveFetchJobListener;
 import org.csstudio.trends.databrowser2.exportview.ExportView;
 import org.csstudio.trends.databrowser2.imports.SampleImporters;
+import org.csstudio.trends.databrowser2.model.ArchiveDataSource;
 import org.csstudio.trends.databrowser2.model.AxisConfig;
 import org.csstudio.trends.databrowser2.model.Model;
 import org.csstudio.trends.databrowser2.model.ModelItem;
 import org.csstudio.trends.databrowser2.model.ModelListener;
 import org.csstudio.trends.databrowser2.model.ModelListenerAdapter;
 import org.csstudio.trends.databrowser2.model.PVItem;
+import org.csstudio.trends.databrowser2.model.PlotSample;
+import org.csstudio.trends.databrowser2.model.PlotSamples;
+import org.csstudio.trends.databrowser2.model.RequestType;
 import org.csstudio.trends.databrowser2.persistence.XMLPersistence;
 import org.csstudio.trends.databrowser2.preferences.Preferences;
 import org.csstudio.trends.databrowser2.propsheet.DataBrowserPropertySheetPage;
@@ -36,6 +52,7 @@ import org.csstudio.trends.databrowser2.ui.AddPVAction;
 import org.csstudio.trends.databrowser2.ui.Controller;
 import org.csstudio.trends.databrowser2.ui.ModelBasedPlot;
 import org.csstudio.trends.databrowser2.ui.RefreshAction;
+import org.csstudio.trends.databrowser2.waveformview.WaveformValueDataProvider;
 import org.csstudio.trends.databrowser2.waveformview.WaveformView;
 import org.csstudio.ui.util.EmptyEditorInput;
 import org.csstudio.ui.util.dialogs.ExceptionDetailsErrorDialog;
@@ -53,12 +70,23 @@ import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.osgi.util.NLS;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.ControlEvent;
+import org.eclipse.swt.events.ControlListener;
+import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.events.MouseListener;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.layout.FillLayout;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Slider;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.IEditorSite;
@@ -81,12 +109,16 @@ import org.eclipse.ui.views.properties.IPropertySheetPage;
  *  @author Kay Kasemir
  *  @author Xihui Chen (Adjustment to make it work like a view in RAP)
  *  @author Naceur Benhadj (add property to hide "Property" view)
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added fast waveform plot) 
  */
 @SuppressWarnings("nls")
 public class DataBrowserEditor extends EditorPart
 {
     /** Editor ID (same ID as original Data Browser) registered in plugin.xml */
     final public static String ID = "org.csstudio.trends.databrowser.ploteditor.PlotEditor"; //$NON-NLS-1$
+    
+    /** True if show DataBrowserEditor with waveform */
+    private static boolean showWaveform = false;
 
     /** Data model */
     private Model model;
@@ -102,7 +134,22 @@ public class DataBrowserEditor extends EditorPart
 
     /** @see #isDirty() */
     private boolean is_dirty = false;
-
+    
+    /** Waveform plot */
+    private RTValuePlot waveformPlot;
+    
+    /** Slider for selecting samples */
+    private Slider sampleIndexSlider;
+    
+    /** Plot search */
+    private PlotDataSearch<Instant> plotSearch;
+    
+    /** Executor service */
+    private ExecutorService executorService;
+    
+    /** Waveform color */
+    private RGB waveformColor = new RGB(212, 212, 111);
+    
     /** Create data browser editor
      *  @param input Input for editor, must be data browser config file
      *  @return DataBrowserEditor or <code>null</code> on error
@@ -115,6 +162,7 @@ public class DataBrowserEditor extends EditorPart
         	final IWorkbench workbench = PlatformUI.getWorkbench();
         	final IWorkbenchWindow window = workbench.getActiveWorkbenchWindow();
         	final IWorkbenchPage page = window.getActivePage();
+        	showWaveform = false;
             editor = (DataBrowserEditor) page.openEditor(input, ID);
         }
         catch (Exception ex)
@@ -143,6 +191,57 @@ public class DataBrowserEditor extends EditorPart
         }
 
         return createInstance(new EmptyEditorInput()
+        {
+            @Override
+            public String getName()
+            {
+                if (SingleSourcePlugin.isRAP()) return "Data Browser";
+                return super.getName();
+            }
+        });
+    }
+    
+    /** Create data browser editor with waveform.
+     *  @param input Input for editor, must be data browser config file
+     *  @return DataBrowserEditor or <code>null</code> on error
+     */
+    public static DataBrowserEditor createInstanceWithWaveform(final IEditorInput input)
+    {
+        final DataBrowserEditor editor;
+        try
+        {
+        	final IWorkbench workbench = PlatformUI.getWorkbench();
+        	final IWorkbenchWindow window = workbench.getActiveWorkbenchWindow();
+        	final IWorkbenchPage page = window.getActivePage();
+        	showWaveform = true;
+            editor = (DataBrowserEditor) page.openEditor(input, ID);
+        }
+        catch (Exception ex)
+        {
+            Activator.getLogger().log(Level.SEVERE, "Cannot create DataBrowserEditor", ex); //$NON-NLS-1$
+            return null;
+        }
+        return editor;
+    }
+    
+    /** Create an empty data browser editor with waveform.
+     *  @return DataBrowserEditor or <code>null</code> on error
+     */
+    public static DataBrowserEditor createInstanceWithWaveform()
+    {
+        if (SingleSourcePlugin.isRAP())
+        {
+            if (Preferences.isDataBrowserSecured()
+                    && !SingleSourcePlugin.getUIHelper().rapIsLoggedIn(
+                            Display.getCurrent()))
+            {
+                if (!SingleSourcePlugin.getUIHelper().rapAuthenticate(
+                        Display.getCurrent())) return null;
+            }
+
+        }
+
+        return createInstanceWithWaveform(new EmptyEditorInput()
         {
             @Override
             public String getName()
@@ -266,6 +365,8 @@ public class DataBrowserEditor extends EditorPart
 			{   setDirty(true);   }
         };
         model.addListener(model_listener);
+        
+        plotSearch = new PlotDataSearch<Instant>();
     }
 
     /** Provide custom property sheet for this editor */
@@ -284,10 +385,11 @@ public class DataBrowserEditor extends EditorPart
     @Override
     public void createPartControl(final Composite parent)
     {
-        // Create GUI elements (Plot)
-        parent.setLayout(new FillLayout());
-        plot = new ModelBasedPlot(parent);
-
+    	if (showWaveform) {
+    		createPartControlWithWaveform(parent);
+    	} else {
+    		createPartControlWithoutWaveform(parent);
+    	}
         // Create and start controller
         controller = new Controller(parent.getShell(), model, plot);
         try
@@ -345,6 +447,54 @@ public class DataBrowserEditor extends EditorPart
         });
 
         createContextMenu(plot.getPlot().getPlotControl());
+    }
+    
+    /**
+     * Create plot GUI with waveform.
+     * 
+     * @param parent composite parent
+     */
+    private void createPartControlWithWaveform(final Composite parent) {
+    	 //Create GUI elements
+    	 parent.setLayout(new GridLayout(2, true));
+         plot = new ModelBasedPlot(parent);
+         plot.getPlot().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
+         onDoubleClickCreateTimestamp(plot);
+         
+         waveformPlot = new RTValuePlot(parent);
+         waveformPlot.setSmartTracePainting(true);
+
+         waveformPlot.getXAxis().setName(Messages.WaveformIndex);
+         waveformPlot.getYAxes().get(0).setName(Messages.WaveformAmplitude);
+         waveformPlot.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 2));
+         
+         sampleIndexSlider = new Slider(parent, SWT.HORIZONTAL);
+         sampleIndexSlider.setToolTipText(Messages.WaveformTimeSelector);
+         sampleIndexSlider.setLayoutData(new GridData(SWT.FILL, SWT.DEFAULT, false, false, 1, 1));
+         onSelectionShowWaveform(sampleIndexSlider);
+         
+         plot.getPlot().getPlotControl().addControlListener(new ControlListener() {
+ 			
+ 			@Override
+ 			public void controlResized(ControlEvent e) {
+ 				setSliderRange();
+ 			}
+ 			
+ 			@Override
+ 			public void controlMoved(ControlEvent e) {
+ 			}
+         });
+    }
+    
+    /**
+     * Create plot GUI.
+     * 
+     * @param parent composite parent
+     */
+    private void createPartControlWithoutWaveform(final Composite parent) {
+    	// Create GUI elements (Plot)
+    	parent.setLayout(new FillLayout());
+        plot = new ModelBasedPlot(parent);
     }
 
     /** Create context menu */
@@ -546,4 +696,194 @@ public class DataBrowserEditor extends EditorPart
         }
         setDirty(false);
     }
+    
+	/**
+	 * Adds mouse listener to the model based plot. On double click creates
+	 * timestamp on the plot.
+	 * 
+	 * @param plot model based plot
+	 */
+    private void onDoubleClickCreateTimestamp(ModelBasedPlot plot) {
+    	plot.getPlot().getPlotControl().addMouseListener(new MouseListener() {
+			
+			@Override
+			public void mouseUp(MouseEvent e) {
+			}
+			
+			@Override
+			public void mouseDown(MouseEvent e) {
+			}
+			
+			@Override
+			public void mouseDoubleClick(MouseEvent e) {
+				if (model.getItems().iterator().hasNext()) {
+					Instant position = calculatePosition(plot.getPlot().getXAxis().getValue(e.x));
+					Timestamp<Instant> timestamp = new Timestamp<Instant>(position);
+					if (plot.getPlot().getTimestamps().isEmpty()) {
+						plot.getPlot().addTimestamp(timestamp);
+					} else {
+						plot.getPlot().updateTimestamp(plot.getPlot().getTimestamps().get(0), position);
+					}
+					getExecutorService().execute(() -> retrieveSample(position));
+					setSliderRange();
+					sampleIndexSlider.setSelection(plot.getPlot().getXAxis().getScreenCoord(position));
+				}
+			}
+		});
+    }
+    
+    /**
+     * Calculates timestamp position.
+     * 
+     * @param x current timestamp
+     * 
+     * @return timestamp position.
+     */
+	private Instant calculatePosition(Instant x) {
+		PlotSample less = null;
+		PlotSample greater = null;
+		for (ModelItem modelItem : model.getItems()) {
+			PlotSamples samples = modelItem.getSamples();
+			int lessIndex = plotSearch.findSampleLessOrEqual(samples, x);
+			int greaterIndex = plotSearch.findSampleGreaterOrEqual(samples, x);
+			if (lessIndex != -1) {
+				less = getBetterSample(less, samples.get(lessIndex), x);
+			}
+			if (greaterIndex != -1) {
+				greater = getBetterSample(greater, samples.get(greaterIndex), x);
+			}
+		}
+		if (less == null && greater == null) {
+			return x;
+		} else if (less == null && greater != null) {
+			return greater.getPosition();
+		} else if (less != null && greater == null) {
+			return less.getPosition();
+		} else {
+			long diff1 = less.getPosition().toEpochMilli() - x.toEpochMilli();
+			long diff2 = greater.getPosition().toEpochMilli() - x.toEpochMilli();
+			return diff1 < diff2 ? less.getPosition() : greater.getPosition();
+		}
+	}
+	
+	/**
+	 * Returns sample which is closer to the current timestamp.
+	 * 
+	 * @param sample1 sample1
+	 * @param sample2 sample2
+	 * @param x timestamp
+	 * 
+	 * @return sample which is closer to the current timestamp.
+	 */
+	private PlotSample getBetterSample(PlotSample sample1, PlotSample sample2, Instant x) {
+		if (sample1 == null) {
+			return sample2;
+		} else {
+			long diff1 = sample1.getPosition().toEpochMilli() - x.toEpochMilli();
+			long diff2 = sample2.getPosition().toEpochMilli() - x.toEpochMilli();
+			if (diff1 > diff2) {
+				return sample2;
+			}
+		}
+		return sample1;
+	}
+    
+	/**
+	 * Adds selection listner to the slider.
+	 * 
+	 * @param slider slider
+	 */
+    private void onSelectionShowWaveform(Slider slider) {
+        slider.addSelectionListener(new SelectionAdapter() {
+        	
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                if (!plot.getPlot().getTimestamps().isEmpty()) {
+            		Instant x = plot.getPlot().getXAxis().getValue(slider.getSelection());
+                	PlotSample item = null;
+                	for (ModelItem modelItem : model.getItems()) {
+                		PlotSamples samples = modelItem.getSamples();
+                		int index = plotSearch.findSampleLessOrEqual(samples, x);
+                		if (index != -1) {
+                			item = getBetterSample(item, samples.get(index), x);
+                		}
+                	}
+                	if (item != null) {
+                		final Instant position = item.getPosition();
+                		plot.getPlot().updateTimestamp(plot.getPlot().getTimestamps().get(0), position);
+                		getExecutorService().execute(() -> retrieveSample(position));
+                	}
+                }
+            }
+        });
+    }
+    
+    /**
+     * Sets slider range.
+     */
+    private void setSliderRange() {
+		Instant min = plot.getPlot().getXAxis().getValueRange().getLow();
+		Instant max = plot.getPlot().getXAxis().getValueRange().getHigh();
+		int x1 = plot.getPlot().getXAxis().getScreenCoord(min);
+		int x2 = plot.getPlot().getXAxis().getScreenCoord(max);
+		sampleIndexSlider.setMinimum(x1);
+		sampleIndexSlider.setMaximum(x2);
+		sampleIndexSlider.setPageIncrement(1);
+    }
+    
+    /** 
+     * Retrieves sample with waveform and shows it in waveform plot.
+     * 
+     * @param timestamp timestamp
+     */
+    private void retrieveSample(Instant timestamp) {
+    	PVItem pv = null;
+		try {
+			pv = new PVItem(Preferences.getFastWaveformPVName(), 0.0);
+	    	pv.setRequestType(RequestType.RAW);
+	    	pv.useDefaultArchiveDataSources();
+		} catch (Exception ex) {
+            Activator.getLogger().log(Level.SEVERE, "Cannot create fast waveform PV item", ex); //$NON-NLS-1$
+            return;
+		}
+		
+    	ArchiveFetchJob fetchJob = new ArchiveFetchJob(pv, timestamp, timestamp, new ArchiveFetchJobListener() {
+			
+			@Override
+			public void fetchCompleted(ArchiveFetchJob job) {
+				PVItem item = job.getPVItem();
+				if (item.getSamples().size() > 0) {
+					PlotSample sample = item.getSamples().get(0);
+					WaveformValueDataProvider dataProvider = new WaveformValueDataProvider();
+					dataProvider.setValue(sample.getVType());
+        		
+					// remove waveform plot traces
+					for (Trace<Double> trace : waveformPlot.getTraces()) {
+						waveformPlot.removeTrace(trace);
+					}
+        		
+					waveformPlot.addTrace("Waveform: " + Preferences.getFastWaveformPVName(), dataProvider, waveformColor, TraceType.NONE, 1, PointType.CIRCLES, 5, 0);
+					waveformPlot.getXAxis().setValueRange(0.0, (double) dataProvider.size());
+					waveformPlot.stagger();
+					waveformPlot.requestUpdate();
+				}
+			}
+			
+			@Override
+			public void archiveFetchFailed(ArchiveFetchJob job, ArchiveDataSource archive, Exception error) {
+			}
+		});
+    	
+    	fetchJob.schedule();
+    }
+    
+    /**
+     * @return created executor.
+     */
+	private ExecutorService getExecutorService() {
+		if (executorService == null) {
+			executorService = new ThreadPoolExecutor(1, 1, 0, TimeUnit.NANOSECONDS, new DismissableBlockingQueue<Runnable>(2));
+		}
+		return executorService;
+	}
 }
