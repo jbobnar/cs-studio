@@ -39,6 +39,7 @@ import org.eclipse.swt.widgets.ToolItem;
  *
  *  @param <XTYPE> Data type used for the {@link PlotDataItem}
  *  @author Kay Kasemir
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added timestamp support) 
  */
 @SuppressWarnings("nls")
 public class RTPlot<XTYPE extends Comparable<XTYPE>> extends Composite

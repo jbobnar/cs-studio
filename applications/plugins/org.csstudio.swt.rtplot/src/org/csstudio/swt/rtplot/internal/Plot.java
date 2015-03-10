@@ -60,6 +60,7 @@ import org.eclipse.swt.widgets.Display;
 /** Plot with axes and area that displays the traces
  *  @param <XTYPE> Data type used for the {@link PlotDataItem}
  *  @author Kay Kasemir
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added timestamp support) 
  */
 @SuppressWarnings("nls")
 public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements PaintListener, MouseListener, MouseMoveListener, MouseTrackListener

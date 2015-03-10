@@ -24,6 +24,7 @@ import org.eclipse.swt.graphics.Rectangle;
 /** Helper for painting a {@link Trace}
  *  @param <XTYPE> Data type of horizontal {@link Axis}
  *  @author Kay Kasemir
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added timestamp support) 
  */
 public class TracePainter<XTYPE extends Comparable<XTYPE>>
 {

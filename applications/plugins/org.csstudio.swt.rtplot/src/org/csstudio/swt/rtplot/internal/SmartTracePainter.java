@@ -24,9 +24,12 @@ import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Rectangle;
 
-/** Helper for painting a {@link Trace}
+/** 
+ * 	Helper for painting a {@link Trace}.
+ * 
  *  @param <XTYPE> Data type of horizontal {@link Axis}
- *  @author Kay Kasemir
+ *  
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a>
  */
 public class SmartTracePainter<XTYPE extends Comparable<XTYPE>> extends TracePainter<XTYPE>
 {
@@ -129,6 +132,15 @@ public class SmartTracePainter<XTYPE extends Comparable<XTYPE>> extends TracePai
         gc.setForeground(old_color);
     }
     
+    /**
+     * Reduce data provider data.
+     * 
+     * @param data data provider
+     * @param x_transform x transform
+     * @param y_axis y axis
+     * 
+     * @return reduced data list.
+     */
 	private List<PlotDataItem<XTYPE>> reduction(final PlotDataProvider<XTYPE> data, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis) {
 		List<PlotDataItem<XTYPE>> reducedList = new ArrayList<PlotDataItem<XTYPE>>();
 		int N = data.size();
@@ -162,6 +174,15 @@ public class SmartTracePainter<XTYPE extends Comparable<XTYPE>> extends TracePai
 		return reducedList;
 	}
 	
+	/**
+	 * Returns reduced data provider.
+	 * 
+	 * @param data data provider
+	 * @param x_transform x transform
+	 * @param y_axis y axis
+	 * 
+	 * @return reduced data provider.
+	 */
 	private PlotDataProvider<XTYPE> getReducedDataProvider(final PlotDataProvider<XTYPE> data, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis) {
 		List<PlotDataItem<XTYPE>> reducedDataList = reduction(data, x_transform, y_axis);
         return new PlotDataProvider<XTYPE>() {
