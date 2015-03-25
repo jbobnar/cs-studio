@@ -148,6 +148,7 @@ public class Messages extends NLS
     public static String GridTT;
     public static String HideTraceWarning;
     public static String HideTraceWarningDetail;
+    public static String HideFastWaveform;
     public static String ImportActionFileSelectorTitleFmt;
     public static String ImportActionLabelFmt;
     public static String ImportDialogMessage;
@@ -247,6 +248,7 @@ public class Messages extends NLS
     public static String ServerAlias;
     public static String SeverityColumn;
     public static String SeverityStatusFmt;
+    public static String ShowFastWaveform;
     public static String StartEndDialogBtn;
     public static String StartEndDialogTT;
     public static String StartTimeLbl;

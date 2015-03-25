@@ -9,11 +9,14 @@ package org.csstudio.trends.databrowser2.editor;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.logging.Level;
 
 import org.csstudio.apputil.ui.workbench.OpenViewAction;
 import org.csstudio.email.EMailSender;
+import org.csstudio.swt.rtplot.Marker;
+import org.csstudio.swt.rtplot.data.PlotDataSearch;
 import org.csstudio.swt.rtplot.undo.UndoableActionManager;
 import org.csstudio.trends.databrowser2.Activator;
 import org.csstudio.trends.databrowser2.Messages;
@@ -26,6 +29,8 @@ import org.csstudio.trends.databrowser2.model.ModelItem;
 import org.csstudio.trends.databrowser2.model.ModelListener;
 import org.csstudio.trends.databrowser2.model.ModelListenerAdapter;
 import org.csstudio.trends.databrowser2.model.PVItem;
+import org.csstudio.trends.databrowser2.model.PlotSample;
+import org.csstudio.trends.databrowser2.model.PlotSamples;
 import org.csstudio.trends.databrowser2.persistence.XMLPersistence;
 import org.csstudio.trends.databrowser2.preferences.Preferences;
 import org.csstudio.trends.databrowser2.propsheet.DataBrowserPropertySheetPage;
@@ -53,12 +58,22 @@ import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.osgi.util.NLS;
-import org.eclipse.swt.layout.FillLayout;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.events.ControlEvent;
+import org.eclipse.swt.events.ControlListener;
+import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.events.MouseListener;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Slider;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.IEditorSite;
@@ -81,13 +96,14 @@ import org.eclipse.ui.views.properties.IPropertySheetPage;
  *  @author Kay Kasemir
  *  @author Xihui Chen (Adjustment to make it work like a view in RAP)
  *  @author Naceur Benhadj (add property to hide "Property" view)
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added fast waveform plot) 
  */
 @SuppressWarnings("nls")
 public class DataBrowserEditor extends EditorPart
 {
     /** Editor ID (same ID as original Data Browser) registered in plugin.xml */
     final public static String ID = "org.csstudio.trends.databrowser.ploteditor.PlotEditor"; //$NON-NLS-1$
-
+    
     /** Data model */
     private Model model;
 
@@ -102,7 +118,17 @@ public class DataBrowserEditor extends EditorPart
 
     /** @see #isDirty() */
     private boolean is_dirty = false;
+    
+    /** Slider for selecting samples */
+    private Slider sampleIndexSlider;
+    
+    /** Plot search */
+    private PlotDataSearch<Instant> plotSearch;
+    
+    private FastWaveform fastWaveform;
 
+    private Composite fastWaveformComposite;
+    
     /** Create data browser editor
      *  @param input Input for editor, must be data browser config file
      *  @return DataBrowserEditor or <code>null</code> on error
@@ -152,7 +178,7 @@ public class DataBrowserEditor extends EditorPart
             }
         });
     }
-
+    
     /** @return Model displayed/edited by this EditorPart */
     public Model getModel()
     {
@@ -266,6 +292,8 @@ public class DataBrowserEditor extends EditorPart
 			{   setDirty(true);   }
         };
         model.addListener(model_listener);
+        
+        plotSearch = new PlotDataSearch<Instant>();
     }
 
     /** Provide custom property sheet for this editor */
@@ -281,13 +309,44 @@ public class DataBrowserEditor extends EditorPart
     /** Create Plot GUI, connect to model via Controller
      *  {@inheritDoc}
      */
+    Shell shell;
     @Override
     public void createPartControl(final Composite parent)
     {
-        // Create GUI elements (Plot)
-        parent.setLayout(new FillLayout());
-        plot = new ModelBasedPlot(parent);
+    	// Create GUI elements
+    	parent.setLayout(new GridLayout());
+    	
+   	 	SashForm sashForm = new SashForm(parent, SWT.VERTICAL);
+   	 	sashForm.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        
+   	 	plot = new ModelBasedPlot(sashForm);
+        plot.getPlot().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        onDoubleClickCreateMarker(plot);
+        
+        fastWaveformComposite = new Composite(sashForm, SWT.NONE);
+   	 	fastWaveformComposite.setLayout(new GridLayout(1, true));
+   	 	fastWaveformComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        fastWaveformComposite.setVisible(false);
 
+        sampleIndexSlider = new Slider(fastWaveformComposite, SWT.HORIZONTAL);
+        sampleIndexSlider.setToolTipText(Messages.WaveformTimeSelector);
+        sampleIndexSlider.setLayoutData(new GridData(SWT.FILL, SWT.DEFAULT, false, false, 1, 1));
+        onSelectionShowWaveform(sampleIndexSlider);
+        
+        fastWaveform = new FastWaveform(fastWaveformComposite);        
+        
+        plot.getPlot().getPlotControl().addControlListener(new ControlListener() {
+			
+			@Override
+			public void controlResized(ControlEvent e) {
+				setSliderRange();
+			}
+			
+			@Override
+			public void controlMoved(ControlEvent e) {
+			}
+        });
+        
         // Create and start controller
         controller = new Controller(parent.getShell(), model, plot);
         try
@@ -346,7 +405,7 @@ public class DataBrowserEditor extends EditorPart
 
         createContextMenu(plot.getPlot().getPlotControl());
     }
-
+    
     /** Create context menu */
     private void createContextMenu(final Control parent)
     {
@@ -420,6 +479,8 @@ public class DataBrowserEditor extends EditorPart
 			if (SendToElogAction.isElogAvailable())
 			    manager.add(new SendToElogAction(shell, plot.getPlot()));
 		}
+		manager.add(new Separator());
+		manager.add(new ShowFastWaveformAction(plot, fastWaveformComposite));
     }
 
     /** {@inheritDoc} */
@@ -545,5 +606,139 @@ public class DataBrowserEditor extends EditorPart
             monitor.done();
         }
         setDirty(false);
+    }
+    
+	/**
+	 * Adds mouse listener to the model based plot. On double click creates
+	 * marker on the plot.
+	 * 
+	 * @param plot model based plot
+	 */
+    private void onDoubleClickCreateMarker(ModelBasedPlot plot) {
+    	plot.getPlot().getPlotControl().addMouseListener(new MouseListener() {
+			
+			@Override
+			public void mouseUp(MouseEvent e) {
+			}
+			
+			@Override
+			public void mouseDown(MouseEvent e) {
+			}
+			
+			@Override
+			public void mouseDoubleClick(MouseEvent e) {
+				if (model.getItems().iterator().hasNext() && fastWaveformComposite.isVisible()) {
+					Instant position = calculatePosition(plot.getPlot().getXAxis().getValue(e.x));
+					Marker<Instant> marker = new Marker<Instant>(position);
+					if (plot.getPlot().getMarkers().isEmpty()) {
+						plot.getPlot().addMarker(marker);
+					} else {
+						plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), position);
+					}
+					fastWaveform.retrieveSample(position);
+					setSliderRange();
+					sampleIndexSlider.setSelection(plot.getPlot().getXAxis().getScreenCoord(position));
+				}
+			}
+		});
+    }
+    
+    /**
+     * Calculates marker position.
+     * 
+     * @param x current marker
+     * 
+     * @return marker position.
+     */
+	private Instant calculatePosition(Instant x) {
+		PlotSample less = null;
+		PlotSample greater = null;
+		for (ModelItem modelItem : model.getItems()) {
+			PlotSamples samples = modelItem.getSamples();
+			int lessIndex = plotSearch.findSampleLessOrEqual(samples, x);
+			int greaterIndex = plotSearch.findSampleGreaterOrEqual(samples, x);
+			if (lessIndex != -1) {
+				less = getBetterSample(less, samples.get(lessIndex), x);
+			}
+			if (greaterIndex != -1) {
+				greater = getBetterSample(greater, samples.get(greaterIndex), x);
+			}
+		}
+		if (less == null && greater == null) {
+			return x;
+		} else if (less == null && greater != null) {
+			return greater.getPosition();
+		} else if (less != null && greater == null) {
+			return less.getPosition();
+		} else {
+			long diff1 = less.getPosition().toEpochMilli() - x.toEpochMilli();
+			long diff2 = greater.getPosition().toEpochMilli() - x.toEpochMilli();
+			return diff1 < diff2 ? less.getPosition() : greater.getPosition();
+		}
+	}
+	
+	/**
+	 * Returns sample which is closer to the current marker.
+	 * 
+	 * @param sample1 sample1
+	 * @param sample2 sample2
+	 * @param x timestamp
+	 * 
+	 * @return sample which is closer to the current marker.
+	 */
+	private PlotSample getBetterSample(PlotSample sample1, PlotSample sample2, Instant x) {
+		if (sample1 == null) {
+			return sample2;
+		} else {
+			long diff1 = sample1.getPosition().toEpochMilli() - x.toEpochMilli();
+			long diff2 = sample2.getPosition().toEpochMilli() - x.toEpochMilli();
+			if (diff1 > diff2) {
+				return sample2;
+			}
+		}
+		return sample1;
+	}
+    
+	/**
+	 * Adds selection listner to the slider.
+	 * 
+	 * @param slider slider
+	 */
+    private void onSelectionShowWaveform(Slider slider) {
+        slider.addSelectionListener(new SelectionAdapter() {
+        	
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                if (!plot.getPlot().getMarkers().isEmpty()) {
+            		Instant x = plot.getPlot().getXAxis().getValue(slider.getSelection());
+                	PlotSample item = null;
+                	for (ModelItem modelItem : model.getItems()) {
+                		PlotSamples samples = modelItem.getSamples();
+                		int index = plotSearch.findSampleLessOrEqual(samples, x);
+                		if (index != -1) {
+                			item = getBetterSample(item, samples.get(index), x);
+                		}
+                	}
+                	if (item != null) {
+                		final Instant position = item.getPosition();
+                		plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), position);
+                		fastWaveform.retrieveSample(position);
+                	}
+                }
+            }
+        });
+    }
+    
+    /**
+     * Sets slider range.
+     */
+    private void setSliderRange() {
+		Instant min = plot.getPlot().getXAxis().getValueRange().getLow();
+		Instant max = plot.getPlot().getXAxis().getValueRange().getHigh();
+		int x1 = plot.getPlot().getXAxis().getScreenCoord(min);
+		int x2 = plot.getPlot().getXAxis().getScreenCoord(max);
+		sampleIndexSlider.setMinimum(x1);
+		sampleIndexSlider.setMaximum(x2);
+		sampleIndexSlider.setPageIncrement(1);
     }
 }

@@ -24,6 +24,7 @@ import org.eclipse.swt.graphics.Rectangle;
 /** Helper for painting a {@link Trace}
  *  @param <XTYPE> Data type of horizontal {@link Axis}
  *  @author Kay Kasemir
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added marker support) 
  */
 public class TracePainter<XTYPE extends Comparable<XTYPE>>
 {
@@ -72,7 +73,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  @param x_transform Coordinate transform used by the x axis
      *  @param trace Trace, has reference to its value axis
      */
-    final public void paint(final GC gc, final SWTMediaPool media, final Rectangle bounds, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis, final Trace<XTYPE> trace)
+    public void paint(final GC gc, final SWTMediaPool media, final Rectangle bounds, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis, final Trace<XTYPE> trace, final PlotDataProvider<XTYPE> data)
     {
         x_min = bounds.x - OUTSIDE;
         x_max = bounds.x + bounds.width + OUTSIDE;
@@ -100,7 +101,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
         //
         // For now, main point is that this happens in non-UI thread,
         // so the slower the better to test UI responsiveness.
-        final PlotDataProvider<XTYPE> data = trace.getData();
+//        final PlotDataProvider<XTYPE> data = trace.getData();
         data.getLock().lock();
         try
         {

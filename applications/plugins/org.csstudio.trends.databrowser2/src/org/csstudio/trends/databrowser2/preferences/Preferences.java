@@ -27,6 +27,7 @@ import org.eclipse.core.runtime.preferences.IPreferencesService;
  *
  *  @author Kay Kasemir
  *  @author Naceur Benhadj (add property to hide "Property" view)
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (add property for fast waveform PV) 
  */
 @SuppressWarnings("nls")
 public class Preferences
@@ -64,7 +65,8 @@ public class Preferences
 			RAP_HIDE_PROPERTIES_VIEW = "rap.hide_properties_view",
 			SECURE_DATA_BROWSER = "secure_data_browser",
 			AUTOMATIC_HISTORY_REFRESH = "automatic_history_refresh",
-			SCROLL_STEP = "scroll_step";
+			SCROLL_STEP = "scroll_step",
+			FAST_WAVEFORM_PV = "fast_waveform_pv";
 
 	public static boolean isAutomaticHistoryRefresh()
 	{
@@ -325,5 +327,14 @@ public class Preferences
 		if (prefs == null)
 			return false;
 		return prefs.getBoolean(Activator.PLUGIN_ID, SECURE_DATA_BROWSER, false, null);
+    }
+    
+    /** @return fast waveform PV. */
+    public static String getFastWaveformPVName() {
+    	final IPreferencesService prefs = Platform.getPreferencesService();
+    	if (prefs == null) {
+    		return "";
+    	}
+    	return prefs.getString(Activator.PLUGIN_ID, FAST_WAVEFORM_PV, "", null);
     }
 }
