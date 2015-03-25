@@ -25,7 +25,7 @@ import org.csstudio.swt.rtplot.AxisRange;
 import org.csstudio.swt.rtplot.Messages;
 import org.csstudio.swt.rtplot.PlotListener;
 import org.csstudio.swt.rtplot.SWTMediaPool;
-import org.csstudio.swt.rtplot.Timestamp;
+import org.csstudio.swt.rtplot.Marker;
 import org.csstudio.swt.rtplot.Trace;
 import org.csstudio.swt.rtplot.YAxis;
 import org.csstudio.swt.rtplot.data.PlotDataItem;
@@ -60,7 +60,7 @@ import org.eclipse.swt.widgets.Display;
 /** Plot with axes and area that displays the traces
  *  @param <XTYPE> Data type used for the {@link PlotDataItem}
  *  @author Kay Kasemir
- *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added timestamp support) 
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added marker support) 
  */
 @SuppressWarnings("nls")
 public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements PaintListener, MouseListener, MouseMoveListener, MouseTrackListener
@@ -111,7 +111,7 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
     final private List<YAxisImpl<XTYPE>> y_axes = new CopyOnWriteArrayList<>();
     final private PlotPart plot_area;
     final private List<AnnotationImpl<XTYPE>> annotations = new CopyOnWriteArrayList<>();
-    final private List<TimestampImpl<XTYPE>> timestamps = new CopyOnWriteArrayList<>();
+    final private List<MarkerImpl<XTYPE>> markers = new CopyOnWriteArrayList<>();
 
     final private PlotProcessor<XTYPE> plot_processor;
     
@@ -496,41 +496,41 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
         }
     }
     
-    /** @param annotation Timestamp to add */
+    /** @param marker marker to add in the markers list */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-	public void addTimestamp(final Timestamp<XTYPE> timestamp) {
-    	Objects.requireNonNull(timestamp);
-    	if (timestamp instanceof TimestampImpl)
-    		timestamps.add((TimestampImpl) timestamp);
+	public void addMarker(final Marker<XTYPE> marker) {
+    	Objects.requireNonNull(marker);
+    	if (marker instanceof MarkerImpl)
+    		markers.add((MarkerImpl) marker);
     	else
-    		timestamps.add(new TimestampImpl<XTYPE>(timestamp.getPosition()));
+    		markers.add(new MarkerImpl<XTYPE>(marker.getPosition()));
     	requestUpdate();
     }
     
-    /** @return Current {@link TimestampImpl}s */
-    public List<TimestampImpl<XTYPE>> getTimestamps() {
-    	return timestamps;
+    /** @return Current {@link MarkerImpl}s */
+    public List<MarkerImpl<XTYPE>> getMarkers() {
+    	return markers;
     }
     
-    /** @param timestamp Timestamp to remove */
-    public void removeTimestamp(final Timestamp<XTYPE> timestamp) {
-    	timestamps.remove(timestamp);
+    /** @param marker marker to remove from the markers list */
+    public void removeMarker(final Marker<XTYPE> marker) {
+    	markers.remove(marker);
         requestUpdate();
     }
     
     /**
-     * Update timestamp position.
+     * Update marker position.
      * 
-     * @param timestamp {@link Timestamp} to update.
-     *        Must be an existing timestamp obtained from <code>getTimestamps()</code>
-     * @param position new timestamp position
-     * @throws IllegalArgumentException if timestamp is unknown
+     * @param marker {@link Marker} to update.
+     *        Must be an existing marker obtained from <code>getMarkers()</code>
+     * @param position new marker position
+     * @throws IllegalArgumentException if marker is unknown
      */
-    public void updateTimestamp(final Timestamp<XTYPE> timestamp, final XTYPE position) {
-    	final int index = timestamps.indexOf(timestamp);
+    public void updateMarker(final Marker<XTYPE> marker, final XTYPE position) {
+    	final int index = markers.indexOf(marker);
         if (index < 0)
-            throw new IllegalArgumentException("Unknown timestamp " + timestamp);
-        timestamps.get(index).setPosition(position);
+            throw new IllegalArgumentException("Unknown marker " + marker);
+        markers.get(index).setPosition(position);
         requestUpdate();
         fireAnnotationsChanged();
     }
@@ -605,16 +605,16 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
 
         for (YAxisImpl<XTYPE> y_axis : y_axes)
             for (Trace<XTYPE> trace : y_axis.getTraces())
-                trace_painter.paint(gc, media, plot_area.getBounds(), x_transform, y_axis, trace);
+                trace_painter.paint(gc, media, plot_area.getBounds(), x_transform, y_axis, trace, trace.getData());
 
         // Annotations use label font
         gc.setFont(label_font);
         for (AnnotationImpl<XTYPE> annotation : annotations)
             annotation.paint(gc, media, x_axis, y_axes.get(annotation.getTrace().getYAxis()));
 
-        // Timestamps
-        for (TimestampImpl<XTYPE> timestamp : timestamps)
-        	timestamp.paint(gc, media, plot_area.getBounds(), x_axis);
+        // Markers
+        for (MarkerImpl<XTYPE> marker : markers)
+        	marker.paint(gc, media, plot_area.getBounds(), x_axis);
         
         gc.dispose();
 

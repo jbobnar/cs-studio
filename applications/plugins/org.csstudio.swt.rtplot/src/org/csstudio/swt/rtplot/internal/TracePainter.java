@@ -24,7 +24,7 @@ import org.eclipse.swt.graphics.Rectangle;
 /** Helper for painting a {@link Trace}
  *  @param <XTYPE> Data type of horizontal {@link Axis}
  *  @author Kay Kasemir
- *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added timestamp support) 
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added marker support) 
  */
 public class TracePainter<XTYPE extends Comparable<XTYPE>>
 {
@@ -46,8 +46,8 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  Strictly speaking, we'd have to compute the intersection of
      *  lines with the clip region, but this is much easier to implement.
      */
-    final protected static int OUTSIDE = 1000;
-    protected int x_min, x_max, y_min, y_max;
+    final private static int OUTSIDE = 1000;
+    private int x_min, x_max, y_min, y_max;
 
     final private int clipX(final double x)
     {
@@ -73,7 +73,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  @param x_transform Coordinate transform used by the x axis
      *  @param trace Trace, has reference to its value axis
      */
-    public void paint(final GC gc, final SWTMediaPool media, final Rectangle bounds, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis, final Trace<XTYPE> trace)
+    public void paint(final GC gc, final SWTMediaPool media, final Rectangle bounds, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis, final Trace<XTYPE> trace, final PlotDataProvider<XTYPE> data)
     {
         x_min = bounds.x - OUTSIDE;
         x_max = bounds.x + bounds.width + OUTSIDE;
@@ -101,7 +101,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
         //
         // For now, main point is that this happens in non-UI thread,
         // so the slower the better to test UI responsiveness.
-        final PlotDataProvider<XTYPE> data = trace.getData();
+//        final PlotDataProvider<XTYPE> data = trace.getData();
         data.getLock().lock();
         try
         {
@@ -176,7 +176,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  @param data Data
      *  @param line_width
      */
-    final protected void drawValueStaircase(final GC gc,
+    final private void drawValueStaircase(final GC gc,
             final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis,
             final PlotDataProvider<XTYPE> data, final int line_width)
     {
@@ -217,7 +217,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  @param data Data
      *  @param line_width
      */
-    final protected void drawValueLines(final GC gc,
+    final private void drawValueLines(final GC gc,
             final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis,
             final PlotDataProvider<XTYPE> data, final int line_width)
     {
@@ -252,7 +252,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  @param y_axis Value axis
      *  @param data Data
      */
-    final protected void drawMinMaxArea(final GC gc,
+    final private void drawMinMaxArea(final GC gc,
             final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis,
             final PlotDataProvider<XTYPE> data)
     {
@@ -287,7 +287,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  @param y_axis Value axis
      *  @param data Data
      */
-    final protected void drawMinMaxLines(final GC gc,
+    final private void drawMinMaxLines(final GC gc,
             final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis,
             final PlotDataProvider<XTYPE> data, final int line_width)
     {
@@ -325,7 +325,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  @param data Data
      *  @param line_width
      */
-    final protected void drawStdDevLines(final GC gc, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis,
+    final private void drawStdDevLines(final GC gc, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis,
             final PlotDataProvider<XTYPE> data, final int line_width)
     {
         final IntList lower_poly = new IntList(INITIAL_ARRAY_SIZE);
@@ -377,7 +377,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  @param point_type
      *  @param size
      */
-    final protected void drawPoints(final GC gc,
+    final private void drawPoints(final GC gc,
             final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis,
             final PlotDataProvider<XTYPE> data, PointType point_type, final int size)
     {

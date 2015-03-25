@@ -12,15 +12,11 @@ import java.util.List;
 import java.util.concurrent.locks.Lock;
 
 import org.csstudio.swt.rtplot.Axis;
-import org.csstudio.swt.rtplot.PointType;
 import org.csstudio.swt.rtplot.SWTMediaPool;
 import org.csstudio.swt.rtplot.Trace;
-import org.csstudio.swt.rtplot.TraceType;
 import org.csstudio.swt.rtplot.data.PlotDataItem;
 import org.csstudio.swt.rtplot.data.PlotDataProvider;
 import org.csstudio.swt.rtplot.internal.util.ScreenTransform;
-import org.eclipse.swt.SWT;
-import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Rectangle;
 
@@ -42,94 +38,14 @@ public class SmartTracePainter<XTYPE extends Comparable<XTYPE>> extends TracePai
      *  @param trace Trace, has reference to its value axis
      */
     @Override
-    public void paint(final GC gc, final SWTMediaPool media, final Rectangle bounds, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis, final Trace<XTYPE> trace)
+    public void paint(final GC gc, final SWTMediaPool media, final Rectangle bounds, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis, final Trace<XTYPE> trace, final PlotDataProvider<XTYPE> data)
     {
-        x_min = bounds.x - OUTSIDE;
-        x_max = bounds.x + bounds.width + OUTSIDE;
-        y_min = bounds.y - OUTSIDE;
-        y_max = bounds.y + bounds.height + OUTSIDE;
-
-        final Color old_color = gc.getForeground();
-        final Color old_bg = gc.getBackground();
-        final int old_width = gc.getLineWidth();
-
-        final Color color = media.get(trace.getColor());
-        gc.setBackground(color);
-        gc.setForeground(color);
-
-        // TODO Use anti-alias?
-        gc.setAdvanced(true);
-        gc.setAntialias(SWT.ON);
-        
-        final PlotDataProvider<XTYPE> data = trace.getData();
-        data.getLock().lock();
-        final PlotDataProvider<XTYPE> reducedDataProvider = getReducedDataProvider(data, x_transform, y_axis);
-        reducedDataProvider.getLock().lock();
-        try
-        {
-            final TraceType type = trace.getType();
-            switch (type)
-            {
-            case NONE:
-                break;
-            case AREA:
-                gc.setAlpha(50);
-            	drawMinMaxArea(gc, x_transform, y_axis, reducedDataProvider);
-                gc.setAlpha(255);
-                drawStdDevLines(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                drawValueStaircase(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                break;
-            case AREA_DIRECT:
-                gc.setAlpha(50);
-                drawMinMaxArea(gc, x_transform, y_axis, reducedDataProvider);
-                gc.setAlpha(255);
-                drawStdDevLines(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                drawValueLines(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                break;
-            case LINES:
-                drawMinMaxLines(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                gc.setAlpha(50);
-                drawStdDevLines(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                gc.setAlpha(255);
-                drawValueStaircase(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                break;
-            case LINES_DIRECT:
-                drawMinMaxLines(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                gc.setAlpha(50);
-                drawStdDevLines(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                gc.setAlpha(255);
-                drawValueLines(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                break;
-            case SINGLE_LINE:
-                drawValueStaircase(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                break;
-            case SINGLE_LINE_DIRECT:
-                drawValueLines(gc, x_transform, y_axis, reducedDataProvider, trace.getWidth());
-                break;
-            }
-
-            final PointType point_type = trace.getPointType();
-            switch (point_type)
-            {
-            case NONE:
-                break;
-            case SQUARES:
-            case CIRCLES:
-            case DIAMONDS:
-            case XMARKS:
-            case TRIANGLES:
-                drawPoints(gc, x_transform, y_axis, reducedDataProvider, point_type, trace.getPointSize());
-                break;
-            }
-        }
-        finally
-        {
-        	reducedDataProvider.getLock().unlock();
-            data.getLock().unlock();
-        }
-        gc.setLineWidth(old_width);
-        gc.setBackground(old_bg);
-        gc.setForeground(old_color);
+    	data.getLock().lock();
+    	try {
+    		super.paint(gc, media, bounds, x_transform, y_axis, trace, getReducedDataProvider(data, x_transform, y_axis));
+    	} finally {
+    		data.getLock().unlock();
+    	}
     }
     
     /**
@@ -147,6 +63,9 @@ public class SmartTracePainter<XTYPE extends Comparable<XTYPE>> extends TracePai
 		int x0 = -1;
 		int position = 0;
 		double val0;
+		if (N == 0) {
+			return reducedList;
+		}
 		do {
 			PlotDataItem<XTYPE> item = data.get(position);
 			reducedList.add(item);
@@ -163,12 +82,12 @@ public class SmartTracePainter<XTYPE extends Comparable<XTYPE>> extends TracePai
 				reducedList.add(nextItem);
 			} else {
 				int y1 = (int) y_axis.getScreenCoord(val1);
-				if (Math.abs(x0 - x1) < REDUCTION_DISTANCE || Math.abs(y0 - y1) < REDUCTION_DISTANCE) {
-					continue;
+				if ((x0 - x1 > REDUCTION_DISTANCE || x1 - x0 > REDUCTION_DISTANCE)
+						&& (y0 - y1 > REDUCTION_DISTANCE || y1 - y0 > REDUCTION_DISTANCE)) {
+					reducedList.add(nextItem);
+					x0 = x1;
+					y0 = y1;
 				}
-				reducedList.add(nextItem);
-				x0 = x1;
-				y0 = y1;
 			}
 		}
 		return reducedList;

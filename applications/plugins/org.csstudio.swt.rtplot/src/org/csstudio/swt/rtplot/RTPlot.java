@@ -39,7 +39,7 @@ import org.eclipse.swt.widgets.ToolItem;
  *
  *  @param <XTYPE> Data type used for the {@link PlotDataItem}
  *  @author Kay Kasemir
- *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added timestamp support) 
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added marker support) 
  */
 @SuppressWarnings("nls")
 public class RTPlot<XTYPE extends Comparable<XTYPE>> extends Composite
@@ -254,6 +254,7 @@ public class RTPlot<XTYPE extends Comparable<XTYPE>> extends Composite
             final int y_axis)
     {
         final TraceImpl<XTYPE> trace = new TraceImpl<XTYPE>(name, data, color, type, width, point_type, size, y_axis);
+
         plot.addTrace(trace);
         return trace;
     }
@@ -330,26 +331,36 @@ public class RTPlot<XTYPE extends Comparable<XTYPE>> extends Composite
         plot.removeAnnotation(annotation);
     }
     
-    /** @param timestamp Timestamp to add */
-    public void addTimestamp(final Timestamp<XTYPE> timestamp) {
-    	plot.addTimestamp(timestamp);
+	/**
+	 * Adds marker on the plot. Marker is a vertical line on plot which marks
+	 * selected time (point on x axis).
+	 * 
+	 * @param marker marker to add
+	 */
+    public void addMarker(final Marker<XTYPE> marker) {
+    	plot.addMarker(marker);
     }
     
-    /** @return Current {@link TimestampImpl}s */
-    public List<Timestamp<XTYPE>> getTimestamps() {
-    	return Collections.unmodifiableList(plot.getTimestamps());
+    /** @return list of markers, which are shown on plot. */
+    public List<Marker<XTYPE>> getMarkers() {
+    	return Collections.unmodifiableList(plot.getMarkers());
     }
     
     /**
-     * Update timestamp position.
+     * Update marker position.
      * 
-     * @param timestamp {@link Timestamp} to update.
-     *        Must be an existing timestamp obtained from <code>getTimestamps()</code>
-     * @param position new timestamp position
-     * @throws IllegalArgumentException if timestamp is unknown
+     * @param marker {@link Marker} to update.
+     *        Must be an existing marker obtained from <code>getMarkers()</code>
+     * @param position new marker position on plot
+     * @throws IllegalArgumentException if marker is unknown
      */
-    public void updateTimestamp(final Timestamp<XTYPE> timestamp, final XTYPE position) {
-    	plot.updateTimestamp(timestamp, position);
+    public void updateMarker(final Marker<XTYPE> marker, final XTYPE position) {
+    	plot.updateMarker(marker, position);
+    }
+    
+    /** @param marker marker to remove from the markers list */
+    public void removeMarker(final Marker<XTYPE> marker) {
+    	plot.removeMarker(marker);
     }
     
     /** @return true if smart trace painting is enabled, otherwise false */
