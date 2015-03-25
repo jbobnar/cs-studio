@@ -150,11 +150,6 @@
             id="org.csstudio.trends.databrowser.NewDataBrowserHandler"
             name="%Databrowser">
       </command>
-      <command
-            defaultHandler="org.csstudio.trends.databrowser2.NewDataBrowserWithWaveformHandler"
-            id="org.csstudio.trends.databrowser.NewDataBrowserWithWaveformHandler"
-            name="Data Browser With Waveform">
-      </command>
    </extension>
    <extension
          point="org.eclipse.ui.menus">
@@ -198,12 +193,6 @@
                style="push"
                tooltip="%NewDatabrowserTT">
          </command>
-         <command
-               commandId="org.csstudio.trends.databrowser.NewDataBrowserWithWaveformHandler"
-               icon="icons/wavesample.gif"
-               label="Data Browser With Waveform"
-               style="push">
-         </command>
       </menuContribution>
       <menuContribution
             allPopups="false"
@@ -216,12 +205,6 @@
                    label="%Databrowser"
                    style="push"
                    tooltip="%NewDatabrowserTT">
-             </command>
-             <command
-                   commandId="org.csstudio.trends.databrowser.NewDataBrowserWithWaveformHandler"
-                   icon="icons/wavesample.gif"
-                   label="Data Browser With Waveform"
-                   style="push">
              </command>
          </toolbar>
       </menuContribution>
