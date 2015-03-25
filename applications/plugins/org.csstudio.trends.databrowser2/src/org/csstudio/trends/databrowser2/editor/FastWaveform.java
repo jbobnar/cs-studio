@@ -376,13 +376,6 @@ public class FastWaveform {
 					for (AxisConfig axisConfig : plotModel.getAxes()) {
 						updateAxis(i++, axisConfig);
 					}
-					for (ModelItem key : itemTraceMap.keySet()) {
-						Trace<Double> trace = itemTraceMap.get(key);
-						plot.addTrace(trace.getName(), trace.getData(),
-								trace.getColor(), trace.getType(),
-								trace.getWidth(), trace.getPointType(),
-								trace.getPointSize(), trace.getYAxis());
-					}
 				}
 			}
 
