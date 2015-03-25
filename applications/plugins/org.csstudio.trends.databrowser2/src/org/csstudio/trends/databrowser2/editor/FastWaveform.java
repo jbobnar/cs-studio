@@ -40,6 +40,7 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Shell;
+import org.epics.vtype.VType;
 
 /**
  * Fast waveform plot class.
@@ -287,28 +288,33 @@ public class FastWaveform {
 
 					@Override
 					public void fetchCompleted(ArchiveFetchJob job) {
-						ArrayList<ArchiveFetchJob> fetchJobs = itemJobMap
-								.get(item);
+						ArrayList<ArchiveFetchJob> fetchJobs = itemJobMap.get(item);
 						synchronized (fetchJobs) {
 							fetchJobs.remove(job);
 							if (!fetchJobs.isEmpty())
 								return;
 						}
-
-						WaveformValueDataProvider dataProvider = new WaveformValueDataProvider();
-						dataProvider.setValue(job.getPVItem().getSamples()
-								.get(0).getVType());
-						if (itemTraceMap.containsKey(item)) {
-							Trace<Double> trace = itemTraceMap.remove(item);
-							plot.removeTrace(trace);
+						if (job.getPVItem().getSamples() == null || job.getPVItem().getSamples().size() == 0) {
+							return;
 						}
-						Trace<Double> trace = plot.addTrace(
-								item.getResolvedDisplayName(), dataProvider,
-								item.getColor(), item.getTraceType(),
-								item.getLineWidth(), item.getPointType(),
-								item.getPointSize(), item.getAxisIndex());
-						itemTraceMap.put(item, trace);
+						VType value = job.getPVItem().getSamples().get(0).getVType();
+						if (itemTraceMap.containsKey(item)) {
+							Trace<Double> trace = itemTraceMap.get(item);
+							if (trace.getData() != null && trace.getData() instanceof WaveformValueDataProvider) {
+								((WaveformValueDataProvider)itemTraceMap.get(item).getData()).setValue(value);
+							}
+							
+						} else {
+							WaveformValueDataProvider dataProvider = new WaveformValueDataProvider();
+							dataProvider.setValue(value);
+							Trace<Double> trace = plot.addTrace(item.getResolvedDisplayName(), dataProvider,
+									item.getColor(), item.getTraceType(),
+									item.getLineWidth(), item.getPointType(),
+									item.getPointSize(), item.getAxisIndex());
+							itemTraceMap.put(item, trace);
+						}						
 						plot.stagger();
+						plot.requestUpdate();
 					}
 
 					@Override
