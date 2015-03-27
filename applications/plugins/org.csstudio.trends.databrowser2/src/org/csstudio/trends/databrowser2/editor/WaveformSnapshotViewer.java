@@ -314,7 +314,12 @@ public class WaveformSnapshotViewer {
 						} else {
 							PlotDataProvider<Double> dataProvider = trace.getData();
 							if (dataProvider instanceof WaveformValueDataProvider) {
+								boolean resize = dataProvider.size() == 0;
 								((WaveformValueDataProvider)dataProvider).setValue(data);
+								if (resize && data instanceof ArchiveVNumberArray) {
+									plot.getXAxis().setValueRange(0., Double.valueOf(((ArchiveVNumberArray) data).getData().size()));
+									
+								}
 							}
 						}
 						
