@@ -7,11 +7,11 @@ import org.eclipse.jface.action.Action;
 import org.eclipse.swt.widgets.Composite;
 
 /**
- * Show fast waveform action class.
+ * <code>ShowWaveformSnapshotAction</code> displays the waveform snapshot viewer.
  * 
  * @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a>
  */
-public class ShowFastWaveformAction extends Action {
+public class ShowWaveformSnapshotAction extends Action {
 
 	private ModelBasedPlot plot;
 	private Composite composite;
@@ -22,8 +22,8 @@ public class ShowFastWaveformAction extends Action {
 	 * @param plot plot
 	 * @param composite composite
 	 */
-	public ShowFastWaveformAction(ModelBasedPlot plot, Composite composite) {
-		super(composite.getVisible() ? Messages.HideFastWaveform : Messages.ShowFastWaveform,
+	public ShowWaveformSnapshotAction(ModelBasedPlot plot, Composite composite) {
+		super(composite.getVisible() ? Messages.HideSnapshotViewer : Messages.ShowSnapshotViewer,
 	              Activator.getDefault().getImageDescriptor("icons/add.gif"));
 		this.composite = composite;
 		this.plot = plot;

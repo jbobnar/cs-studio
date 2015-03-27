@@ -96,7 +96,7 @@ import org.eclipse.ui.views.properties.IPropertySheetPage;
  *  @author Kay Kasemir
  *  @author Xihui Chen (Adjustment to make it work like a view in RAP)
  *  @author Naceur Benhadj (add property to hide "Property" view)
- *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added fast waveform plot) 
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added waveform snapshot viewer) 
  */
 @SuppressWarnings("nls")
 public class DataBrowserEditor extends EditorPart
@@ -125,9 +125,9 @@ public class DataBrowserEditor extends EditorPart
     /** Plot search */
     private PlotDataSearch<Instant> plotSearch;
     
-    private FastWaveform fastWaveform;
+    private WaveformSnapshotViewer waveformSnapshotViewer;
 
-    private Composite fastWaveformComposite;
+    private Composite waveformSnapshotComposite;
     
     /** Create data browser editor
      *  @param input Input for editor, must be data browser config file
@@ -321,17 +321,17 @@ public class DataBrowserEditor extends EditorPart
         plot.getPlot().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
         onDoubleClickCreateMarker(plot);
         
-        fastWaveformComposite = new Composite(sashForm, SWT.NONE);
-   	 	fastWaveformComposite.setLayout(new GridLayout(1, true));
-   	 	fastWaveformComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
-        fastWaveformComposite.setVisible(false);
+        waveformSnapshotComposite = new Composite(sashForm, SWT.NONE);
+        waveformSnapshotComposite.setLayout(new GridLayout(1, true));
+        waveformSnapshotComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        waveformSnapshotComposite.setVisible(false);
 
-        sampleIndexSlider = new Slider(fastWaveformComposite, SWT.HORIZONTAL);
+        sampleIndexSlider = new Slider(waveformSnapshotComposite, SWT.HORIZONTAL);
         sampleIndexSlider.setToolTipText(Messages.WaveformTimeSelector);
         sampleIndexSlider.setLayoutData(new GridData(SWT.FILL, SWT.DEFAULT, false, false, 1, 1));
         onSelectionShowWaveform(sampleIndexSlider);
         
-        fastWaveform = new FastWaveform(fastWaveformComposite);        
+        waveformSnapshotViewer = new WaveformSnapshotViewer(waveformSnapshotComposite);        
         
         plot.getPlot().getPlotControl().addControlListener(new ControlListener() {
 			
@@ -479,6 +479,9 @@ public class DataBrowserEditor extends EditorPart
             if (SendToElogAction.isElogAvailable())
                 manager.add(new SendToElogAction(shell, plot.getPlot()));
         }
+        manager.add(new Separator());
+		manager.add(new ShowWaveformSnapshotAction(plot, waveformSnapshotComposite));
+
     }
 
     /** {@inheritDoc} */
@@ -625,7 +628,7 @@ public class DataBrowserEditor extends EditorPart
 			
 			@Override
 			public void mouseDoubleClick(MouseEvent e) {
-				if (model.getItems().iterator().hasNext() && fastWaveformComposite.isVisible()) {
+				if (model.getItems().iterator().hasNext() && waveformSnapshotComposite.isVisible()) {
 					Instant position = calculatePosition(plot.getPlot().getXAxis().getValue(e.x));
 					Marker<Instant> marker = new Marker<Instant>(position);
 					if (plot.getPlot().getMarkers().isEmpty()) {
@@ -633,7 +636,7 @@ public class DataBrowserEditor extends EditorPart
 					} else {
 						plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), position);
 					}
-					fastWaveform.retrieveSample(position);
+					waveformSnapshotViewer.retrieveSample(position);
 					setSliderRange();
 					sampleIndexSlider.setSelection(plot.getPlot().getXAxis().getScreenCoord(position));
 				}
@@ -720,7 +723,7 @@ public class DataBrowserEditor extends EditorPart
                 	if (item != null) {
                 		final Instant position = item.getPosition();
                 		plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), position);
-                		fastWaveform.retrieveSample(position);
+                		waveformSnapshotViewer.retrieveSample(position);
                 	}
                 }
             }

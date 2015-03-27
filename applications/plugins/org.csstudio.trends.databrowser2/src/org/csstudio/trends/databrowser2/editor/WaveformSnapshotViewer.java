@@ -4,13 +4,16 @@ import java.io.File;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.csstudio.archive.vtype.ArchiveVNumberArray;
 import org.csstudio.csdata.ProcessVariable;
 import org.csstudio.swt.rtplot.RTValuePlot;
 import org.csstudio.swt.rtplot.Trace;
 import org.csstudio.swt.rtplot.YAxis;
+import org.csstudio.swt.rtplot.data.PlotDataProvider;
 import org.csstudio.swt.rtplot.undo.UndoableActionManager;
 import org.csstudio.trends.databrowser2.Messages;
 import org.csstudio.trends.databrowser2.archive.ArchiveFetchJob;
@@ -33,23 +36,26 @@ import org.csstudio.trends.databrowser2.ui.AddPVAction;
 import org.csstudio.trends.databrowser2.waveformview.WaveformValueDataProvider;
 import org.csstudio.ui.util.dialogs.ExceptionDetailsErrorDialog;
 import org.csstudio.ui.util.dnd.ControlSystemDropTarget;
-import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jface.window.Window;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Shell;
+import org.epics.vtype.VType;
+
 
 /**
- * Fast waveform plot class.
+ * <code>WaveformSnapshotViewer</code> is a viewer for waveform types, which is capable of showing waveform samples.
+ * The viewer displays a single waveform value at a time, which is fetched from the archiving service on request.
+ * Every time when a new timestamp is set the viewer will fetch the waveform data for the selected timestamp.
  * 
  * @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a>
  */
-public class FastWaveform {
-
-	private final Map<ModelItem, ArrayList<ArchiveFetchJob>> itemJobMap = new HashMap<ModelItem, ArrayList<ArchiveFetchJob>>();
-	private final Map<ModelItem, Trace<Double>> itemTraceMap = new HashMap<ModelItem, Trace<Double>>();
+public class WaveformSnapshotViewer {
+	
+	private final Map<ModelItem, List<ArchiveFetchJob>> itemJobMap = new HashMap<>();
+	private final Map<ModelItem, Trace<Double>> itemTraceMap = new HashMap<>();
 
 	private Model plotModel;
 	private ModelListener plotModelListener;
@@ -59,11 +65,11 @@ public class FastWaveform {
 	private Instant currentTimestamp;
 
 	/**
-	 * Constructs fast waveform plot.
+	 * Constructs a new viewer.
 	 * 
 	 * @param parent parent
 	 */
-	public FastWaveform(Composite parent) {
+	public WaveformSnapshotViewer(Composite parent) {
 		shell = parent.getShell();
 		plotModel = new Model();
 		plotModelListener = createPlotModelListener();
@@ -87,11 +93,7 @@ public class FastWaveform {
 	public void retrieveSample(Instant timestamp) {
 		currentTimestamp = timestamp;
 		for (ModelItem item : plotModel.getItems()) {
-			try {
-				retrieveSample(item, timestamp);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			retrieveSample(item, timestamp);
 		}
 	}
 	
@@ -274,8 +276,7 @@ public class FastWaveform {
 	 * 
 	 * @throws Exception exception
 	 */
-	private void retrieveSample(ModelItem item, Instant timestamp)
-			throws Exception {
+	private void retrieveSample(final ModelItem item, Instant timestamp) {
 		if (!(item instanceof PVItem)) {
 			return;
 		}
@@ -287,33 +288,54 @@ public class FastWaveform {
 
 					@Override
 					public void fetchCompleted(ArchiveFetchJob job) {
-						ArrayList<ArchiveFetchJob> fetchJobs = itemJobMap
-								.get(item);
+						List<ArchiveFetchJob> fetchJobs = itemJobMap.get(item);
 						synchronized (fetchJobs) {
 							fetchJobs.remove(job);
-							if (!fetchJobs.isEmpty())
-								return;
+							if (!fetchJobs.isEmpty()) {
+								fetchJobs.get(0).schedule();
+							}
 						}
 
-						WaveformValueDataProvider dataProvider = new WaveformValueDataProvider();
-						dataProvider.setValue(job.getPVItem().getSamples()
-								.get(0).getVType());
-						if (itemTraceMap.containsKey(item)) {
-							Trace<Double> trace = itemTraceMap.remove(item);
-							plot.removeTrace(trace);
+						
+						Trace<Double> trace = itemTraceMap.get(item);
+						VType data = job.getPVItem().getSamples().get(0).getVType();
+						if (trace == null) {
+							WaveformValueDataProvider dataProvider = new WaveformValueDataProvider();
+							dataProvider.setValue(data);
+							trace = plot.addTrace(
+									item.getResolvedDisplayName(), dataProvider,
+									item.getColor(), item.getTraceType(),
+									item.getLineWidth(), item.getPointType(),
+									item.getPointSize(), item.getAxisIndex());
+							itemTraceMap.put(item,trace);
+							if (data instanceof ArchiveVNumberArray) {
+								plot.getXAxis().setValueRange(0., Double.valueOf(((ArchiveVNumberArray) data).getData().size()));
+							}
+						} else {
+							PlotDataProvider<Double> dataProvider = trace.getData();
+							if (dataProvider instanceof WaveformValueDataProvider) {
+								boolean resize = dataProvider.size() == 0;
+								((WaveformValueDataProvider)dataProvider).setValue(data);
+								if (resize && data instanceof ArchiveVNumberArray) {
+									plot.getXAxis().setValueRange(0., Double.valueOf(((ArchiveVNumberArray) data).getData().size()));
+									
+								}
+							}
 						}
-						Trace<Double> trace = plot.addTrace(
-								item.getResolvedDisplayName(), dataProvider,
-								item.getColor(), item.getTraceType(),
-								item.getLineWidth(), item.getPointType(),
-								item.getPointSize(), item.getAxisIndex());
-						itemTraceMap.put(item, trace);
-						plot.stagger();
+						
+						plot.requestUpdate();
 					}
 
 					@Override
 					public void archiveFetchFailed(ArchiveFetchJob job,
 							ArchiveDataSource archive, Exception error) {
+						List<ArchiveFetchJob> fetchJobs = itemJobMap.get(item);
+						synchronized (fetchJobs) {
+							fetchJobs.remove(job);
+							if (!fetchJobs.isEmpty()) {
+								fetchJobs.get(0).schedule();
+							}
+						}
 					}
 
 				});
@@ -328,25 +350,18 @@ public class FastWaveform {
 	 * @param job scheduled job
 	 */
 	private void scheduleFetchJob(ModelItem item, ArchiveFetchJob job) {
-		ArrayList<ArchiveFetchJob> fetchJobs = itemJobMap.get(item);
+		List<ArchiveFetchJob> fetchJobs = itemJobMap.get(item);
 		synchronized (fetchJobs) {
 			if (fetchJobs.isEmpty()) {
 				fetchJobs.add(job);
+				job.schedule();
+			} else if (fetchJobs.size() == 1) {
+				fetchJobs.add(job);
 			} else {
-				if (fetchJobs.get(0).getState() == Job.RUNNING) {
-					if (fetchJobs.size() == 2) {
-						fetchJobs.get(1).cancel();
-						fetchJobs.remove(1);
-						fetchJobs.add(job);
-					}
-				} else {
-					fetchJobs.get(0).cancel();
-					fetchJobs.remove(0);
-					fetchJobs.add(job);
-				}
+				fetchJobs.remove(1);
+				fetchJobs.add(job);				
 			}
 		}
-		job.schedule();
 	}
 
 	/**
@@ -376,25 +391,14 @@ public class FastWaveform {
 					for (AxisConfig axisConfig : plotModel.getAxes()) {
 						updateAxis(i++, axisConfig);
 					}
-					for (ModelItem key : itemTraceMap.keySet()) {
-						Trace<Double> trace = itemTraceMap.get(key);
-						plot.addTrace(trace.getName(), trace.getData(),
-								trace.getColor(), trace.getType(),
-								trace.getWidth(), trace.getPointType(),
-								trace.getPointSize(), trace.getYAxis());
-					}
 				}
 			}
 
 			@Override
 			public void itemAdded(final ModelItem item) {
-				itemJobMap.put(item, new ArrayList<ArchiveFetchJob>());
+				itemJobMap.put(item, new ArrayList<ArchiveFetchJob>(2));
 				if (currentTimestamp != null && item instanceof PVItem) {
-					try {
-						retrieveSample(item, currentTimestamp);
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
+					retrieveSample(item, currentTimestamp);
 				} else {
 					WaveformValueDataProvider dataProvider = new WaveformValueDataProvider();
 					Trace<Double> trace = plot.addTrace(
