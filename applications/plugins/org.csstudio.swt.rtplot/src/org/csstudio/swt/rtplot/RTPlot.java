@@ -331,45 +331,38 @@ public class RTPlot<XTYPE extends Comparable<XTYPE>> extends Composite
         plot.removeAnnotation(annotation);
     }
     
-	/**
-	 * Adds marker on the plot. Marker is a vertical line on plot which marks
-	 * selected time (point on x axis).
-	 * 
-	 * @param marker marker to add
-	 */
+    /**
+     * Adds marker on the plot. Marker is a vertical line on plot which marks
+     * selected time (point on x axis).
+     * 
+     * @param marker marker to add
+     */
     public void addMarker(final Marker<XTYPE> marker) {
-    	plot.addMarker(marker);
+        plot.addMarker(marker);
     }
-    
+
     /** @return list of markers, which are shown on plot. */
     public List<Marker<XTYPE>> getMarkers() {
-    	return Collections.unmodifiableList(plot.getMarkers());
+        return Collections.unmodifiableList(plot.getMarkers());
     }
-    
+
     /**
      * Update marker position.
      * 
-     * @param marker {@link Marker} to update.
-     *        Must be an existing marker obtained from <code>getMarkers()</code>
+     * @param marker {@link Marker} to update. Must be an existing marker obtained 
+     *               from <code>getMarkers()</code>
      * @param position new marker position on plot
      * @throws IllegalArgumentException if marker is unknown
      */
     public void updateMarker(final Marker<XTYPE> marker, final XTYPE position) {
-    	plot.updateMarker(marker, position);
+        plot.updateMarker(marker, position);
     }
-    
-    /** @param marker marker to remove from the markers list */
+
+    /**
+     * @param marker
+     *            marker to remove from the markers list
+     */
     public void removeMarker(final Marker<XTYPE> marker) {
-    	plot.removeMarker(marker);
-    }
-    
-    /** @return true if smart trace painting is enabled, otherwise false */
-    public boolean isSmartTracePainting() {
-    	return plot.isSmartTracePainting();
-    }
-    
-    /** @param isSmartTracePainting smart trace painting */
-    public void setSmartTracePainting(boolean isSmartTracePainting) {
-    	plot.setSmartTracePainting(isSmartTracePainting);
+        plot.removeMarker(marker);
     }
 }

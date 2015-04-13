@@ -110,13 +110,12 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
     final private AxisPart<XTYPE> x_axis;
     final private List<YAxisImpl<XTYPE>> y_axes = new CopyOnWriteArrayList<>();
     final private PlotPart plot_area;
+    final private TracePainter<XTYPE> trace_painter = new TracePainter<XTYPE>();
     final private List<AnnotationImpl<XTYPE>> annotations = new CopyOnWriteArrayList<>();
     final private List<MarkerImpl<XTYPE>> markers = new CopyOnWriteArrayList<>();
 
     final private PlotProcessor<XTYPE> plot_processor;
     
-    private TracePainter<XTYPE> trace_painter = new TracePainter<XTYPE>();
-
     final private Runnable redraw_runnable = () ->
     {
         if (isDisposed())
@@ -532,7 +531,6 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
             throw new IllegalArgumentException("Unknown marker " + marker);
         markers.get(index).setPosition(position);
         requestUpdate();
-        fireAnnotationsChanged();
     }
     
     /** Compute layout of plot components */
@@ -1120,20 +1118,6 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
         plot_processor.stagger();
     }
     
-    /** @return true if smart trace painting is enabled, otherwise false */
-    public boolean isSmartTracePainting() {
-    	return trace_painter instanceof SmartTracePainter;
-    }
-    
-    /** @param isSmartTracePainting smart trace painting */
-    public void setSmartTracePainting(boolean isSmartTracePainting) {
-    	if (isSmartTracePainting) {
-    		trace_painter = new SmartTracePainter<XTYPE>();
-    	} else {
-    		trace_painter = new TracePainter<XTYPE>();
-    	}
-    }
-
     /** Notify listeners */
     public void fireXAxisChange()
     {
