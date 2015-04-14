@@ -18,6 +18,7 @@ import org.csstudio.swt.rtplot.Trace;
 import org.csstudio.swt.rtplot.TraceType;
 import org.csstudio.swt.rtplot.data.PlotDataItem;
 import org.csstudio.swt.rtplot.data.PlotDataProvider;
+import org.csstudio.swt.rtplot.data.PlotDataSearch;
 import org.csstudio.swt.rtplot.internal.util.IntList;
 import org.csstudio.swt.rtplot.internal.util.ScreenTransform;
 import org.eclipse.swt.SWT;
@@ -79,13 +80,15 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  @param x_transform Coordinate transform used by the x axis
      *  @param trace Trace, has reference to its value axis
      */
-    public void paint(final GC gc, final SWTMediaPool media, final Rectangle bounds, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis, final Trace<XTYPE> trace, final PlotDataProvider<XTYPE> data)
+    public void paint(final GC gc, final SWTMediaPool media, final Rectangle bounds, final AxisPart<XTYPE> x_axis, final YAxisImpl<XTYPE> y_axis, final Trace<XTYPE> trace, final PlotDataProvider<XTYPE> data)
     {
         x_min = bounds.x - OUTSIDE;
         x_max = bounds.x + bounds.width + OUTSIDE;
         y_min = bounds.y - OUTSIDE;
         y_max = bounds.y + bounds.height + OUTSIDE;
-
+        
+        final ScreenTransform<XTYPE> x_transform = x_axis.getScreenTransform();
+        
         final Color old_color = gc.getForeground();
         final Color old_bg = gc.getBackground();
         final int old_width = gc.getLineWidth();
@@ -109,7 +112,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
         // so the slower the better to test UI responsiveness.
 //        final PlotDataProvider<XTYPE> data = trace.getData();
         data.getLock().lock();
-        PlotDataProvider<XTYPE> reducedData = getReducedDataProvider(data, x_transform, y_axis);
+        PlotDataProvider<XTYPE> reducedData = getReducedDataProvider(data, x_axis, y_axis);
         try
         {
             final TraceType type = trace.getType();
@@ -518,38 +521,43 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      * 
      * @return reduced data list.
      */
-	private List<PlotDataItem<XTYPE>> reduction(final PlotDataProvider<XTYPE> data, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis) {
-		List<PlotDataItem<XTYPE>> reducedList = new ArrayList<PlotDataItem<XTYPE>>();
-		int N = data.size();
+	private List<PlotDataItem<XTYPE>> reduction(final PlotDataProvider<XTYPE> data, final AxisPart<XTYPE> x_axis, final YAxisImpl<XTYPE> y_axis) {
+	    final ScreenTransform<XTYPE> x_transform = x_axis.getScreenTransform();
+	    List<PlotDataItem<XTYPE>> reducedList = new ArrayList<PlotDataItem<XTYPE>>();
+
+	    // find first and last visible item
+	    PlotDataSearch<XTYPE> search = new PlotDataSearch<XTYPE>();
+		int startIndex = search.findSampleGreaterOrEqual(data, x_axis.range.getLow());
+		int endIndex = search.findSampleLessOrEqual(data, x_axis.range.getHigh());
+		
+		// find first item which value is not NaN
 		int x0 = -1;
-		int position = 0;
-		double val0;
-		if (N == 0) {
-			return reducedList;
-		}
+		double val0 = Double.NaN;
 		do {
-			PlotDataItem<XTYPE> item = data.get(position);
-			reducedList.add(item);
-			x0 = (int) x_transform.transform(item.getPosition());
-			val0 = item.getValue();
-			position ++;
-		} while (Double.isNaN(val0));
+		    PlotDataItem<XTYPE> item = data.get(startIndex);
+		    reducedList.add(item);
+		    x0 = (int) x_transform.transform(item.getPosition());
+		    val0 = item.getValue();
+		    startIndex ++;
+		} while (Double.isNaN(val0) && startIndex != endIndex);
 		int y0 = (int) y_axis.getScreenCoord(val0);
-		for (int i = position; i < N; i++) {
-			PlotDataItem<XTYPE> nextItem = data.get(i);
-			int x1 = (int) x_transform.transform(nextItem.getPosition());
-			double val1 = nextItem.getValue();
-			if (Double.isNaN(val1)) {
-				reducedList.add(nextItem);
-			} else {
-				int y1 = (int) y_axis.getScreenCoord(val1);
-				if ((x0 - x1 > REDUCTION_DISTANCE || x1 - x0 > REDUCTION_DISTANCE)
-						&& (y0 - y1 > REDUCTION_DISTANCE || y1 - y0 > REDUCTION_DISTANCE)) {
-					reducedList.add(nextItem);
-					x0 = x1;
-					y0 = y1;
-				}
-			}
+		
+		// reduce data
+		for (int i = startIndex; i < endIndex + 1; i++) {
+		    PlotDataItem<XTYPE> item = data.get(i);
+		    int x1 = (int) x_transform.transform(item.getPosition());
+		    double val1 = item.getValue();
+		    if (Double.isNaN(val1)) {
+		        reducedList.add(item);
+		    } else {
+		        int y1 = (int) y_axis.getScreenCoord(val1);
+	              if ((x0 - x1 > REDUCTION_DISTANCE || x1 - x0 > REDUCTION_DISTANCE)
+	                        && (y0 - y1 > REDUCTION_DISTANCE || y1 - y0 > REDUCTION_DISTANCE)) {
+	                  reducedList.add(item);
+	                  x0 = x1; 
+	                  y0 = y1;
+	              }
+		    }
 		}
 		return reducedList;
 	}
@@ -563,8 +571,8 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
 	 * 
 	 * @return reduced data provider.
 	 */
-	private PlotDataProvider<XTYPE> getReducedDataProvider(final PlotDataProvider<XTYPE> data, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis) {
-		List<PlotDataItem<XTYPE>> reducedDataList = reduction(data, x_transform, y_axis);
+	private PlotDataProvider<XTYPE> getReducedDataProvider(final PlotDataProvider<XTYPE> data, final AxisPart<XTYPE> x_axis, final YAxisImpl<XTYPE> y_axis) {
+		List<PlotDataItem<XTYPE>> reducedDataList = reduction(data, x_axis, y_axis);
         return new PlotDataProvider<XTYPE>() {
 
 			@Override

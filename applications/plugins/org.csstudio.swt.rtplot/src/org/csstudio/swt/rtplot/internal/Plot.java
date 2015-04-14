@@ -29,7 +29,6 @@ import org.csstudio.swt.rtplot.Marker;
 import org.csstudio.swt.rtplot.Trace;
 import org.csstudio.swt.rtplot.YAxis;
 import org.csstudio.swt.rtplot.data.PlotDataItem;
-import org.csstudio.swt.rtplot.internal.util.ScreenTransform;
 import org.csstudio.swt.rtplot.undo.ChangeAxisRanges;
 import org.csstudio.swt.rtplot.undo.UndoableActionManager;
 import org.csstudio.swt.rtplot.undo.UpdateAnnotationAction;
@@ -594,7 +593,6 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
         // because X Axis tends to change from scrolling
         // while we're painting traces
         x_axis.paint(gc, media, label_font, scale_font, plot_bounds);
-        final ScreenTransform<XTYPE> x_transform = x_axis.getScreenTransform();
         for (YAxisImpl<XTYPE> y_axis : y_axes)
             y_axis.paint(gc, media, label_font, scale_font, plot_bounds);
 
@@ -603,7 +601,7 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
 
         for (YAxisImpl<XTYPE> y_axis : y_axes)
             for (Trace<XTYPE> trace : y_axis.getTraces())
-                trace_painter.paint(gc, media, plot_area.getBounds(), x_transform, y_axis, trace, trace.getData());
+                trace_painter.paint(gc, media, plot_area.getBounds(), x_axis, y_axis, trace, trace.getData());
 
         // Annotations use label font
         gc.setFont(label_font);
