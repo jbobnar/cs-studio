@@ -76,7 +76,6 @@ public class WaveformSnapshotViewer {
 		plotModel.addListener(plotModelListener);
 
 		plot = new RTValuePlot(parent);
-		plot.setSmartTracePainting(true);
 
 		plot.getXAxis().setName(Messages.WaveformIndex);
 		plot.getYAxes().get(0).setName(Messages.WaveformAmplitude);
