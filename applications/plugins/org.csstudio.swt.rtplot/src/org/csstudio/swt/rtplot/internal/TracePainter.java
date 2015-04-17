@@ -29,7 +29,7 @@ import org.eclipse.swt.graphics.Rectangle;
 /** Helper for painting a {@link Trace}
  *  @param <XTYPE> Data type of horizontal {@link Axis}
  *  @author Kay Kasemir
- *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added marker support) 
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (reduced data support) 
  */
 public class TracePainter<XTYPE extends Comparable<XTYPE>>
 {
@@ -112,7 +112,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
         // so the slower the better to test UI responsiveness.
 //        final PlotDataProvider<XTYPE> data = trace.getData();
         data.getLock().lock();
-        PlotDataProvider<XTYPE> reducedData = getReducedDataProvider(data, x_axis, y_axis);
+        PlotDataProvider<XTYPE> reducedData = data.size() > 0 ? getReducedDataProvider(data, x_axis, y_axis) : data;
         try
         {
             final TraceType type = trace.getType();
@@ -524,11 +524,14 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
 	private List<PlotDataItem<XTYPE>> reduction(final PlotDataProvider<XTYPE> data, final AxisPart<XTYPE> x_axis, final YAxisImpl<XTYPE> y_axis) {
 	    final ScreenTransform<XTYPE> x_transform = x_axis.getScreenTransform();
 	    List<PlotDataItem<XTYPE>> reducedList = new ArrayList<PlotDataItem<XTYPE>>();
-
+	    
 	    // find first and last visible item
 	    PlotDataSearch<XTYPE> search = new PlotDataSearch<XTYPE>();
 		int startIndex = search.findSampleGreaterOrEqual(data, x_axis.range.getLow());
 		int endIndex = search.findSampleLessOrEqual(data, x_axis.range.getHigh());
+		
+		startIndex = startIndex != -1 ? startIndex : 0;
+		endIndex = endIndex != -1 ? endIndex : data.size();
 		
 		// find first item which value is not NaN
 		int x0 = -1;
