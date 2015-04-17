@@ -633,7 +633,7 @@ public class DataBrowserEditor extends EditorPart
 				    if (!waveformSnapshotComposite.isVisible()) {
 				        new ShowWaveformSnapshotAction(plot.getPlot(), waveformSnapshotComposite).run();
 				    }
-					Instant position = calculatePosition(plot.getPlot().getXAxis().getValue(e.x));
+					Instant position = plot.getPlot().getXAxis().getValue(e.x);
 					Marker<Instant> marker = new Marker<Instant>(position);
 					if (plot.getPlot().getMarkers().isEmpty()) {
 						plot.getPlot().addMarker(marker);
@@ -648,40 +648,6 @@ public class DataBrowserEditor extends EditorPart
 		});
     }
     
-    /**
-     * Calculates marker position.
-     * 
-     * @param x current marker
-     * 
-     * @return marker position.
-     */
-	private Instant calculatePosition(Instant x) {
-		PlotSample less = null;
-		PlotSample greater = null;
-		for (ModelItem modelItem : model.getItems()) {
-			PlotSamples samples = modelItem.getSamples();
-			int lessIndex = plotSearch.findSampleLessOrEqual(samples, x);
-			int greaterIndex = plotSearch.findSampleGreaterOrEqual(samples, x);
-			if (lessIndex != -1) {
-				less = getBetterSample(less, samples.get(lessIndex), x);
-			}
-			if (greaterIndex != -1) {
-				greater = getBetterSample(greater, samples.get(greaterIndex), x);
-			}
-		}
-		if (less == null && greater == null) {
-			return x;
-		} else if (less == null && greater != null) {
-			return greater.getPosition();
-		} else if (less != null && greater == null) {
-			return less.getPosition();
-		} else {
-			long diff1 = less.getPosition().toEpochMilli() - x.toEpochMilli();
-			long diff2 = greater.getPosition().toEpochMilli() - x.toEpochMilli();
-			return diff1 < diff2 ? less.getPosition() : greater.getPosition();
-		}
-	}
-	
 	/**
 	 * Returns sample which is closer to the current marker.
 	 * 
