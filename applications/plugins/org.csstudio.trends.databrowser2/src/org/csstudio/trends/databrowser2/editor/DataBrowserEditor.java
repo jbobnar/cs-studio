@@ -682,19 +682,23 @@ public class DataBrowserEditor extends EditorPart
             public void widgetSelected(SelectionEvent e) {
                 if (!plot.getPlot().getMarkers().isEmpty()) {
             		Instant x = plot.getPlot().getXAxis().getValue(slider.getSelection());
-                	PlotSample item = null;
-                	for (ModelItem modelItem : model.getItems()) {
-                		PlotSamples samples = modelItem.getSamples();
-                		int index = plotSearch.findSampleLessOrEqual(samples, x);
-                		if (index != -1) {
-                			item = getBetterSample(item, samples.get(index), x);
-                		}
-                	}
-                	if (item != null) {
-                		final Instant position = item.getPosition();
-                		plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), position);
-                		waveformSnapshotViewer.retrieveSample(position);
-                	}
+                    new Thread(() -> {
+                        PlotSample item = null;
+                        for (ModelItem modelItem : model.getItems()) {
+                            PlotSamples samples = modelItem.getSamples();
+                            int index = plotSearch.findSampleLessOrEqual(samples, x);
+                            if (index != -1) {
+                                item = getBetterSample(item, samples.get(index), x);
+                            }
+                        }
+                        if (item != null) {
+                            final Instant position = item.getPosition();
+                            Display.getDefault().syncExec(() -> {
+                                plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), position);
+                                waveformSnapshotViewer.retrieveSample(position);
+                            });
+                        }
+                    }).start();
                 }
             }
         });
