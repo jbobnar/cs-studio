@@ -36,11 +36,15 @@ import org.csstudio.trends.databrowser2.ui.AddPVAction;
 import org.csstudio.trends.databrowser2.waveformview.WaveformValueDataProvider;
 import org.csstudio.ui.util.dialogs.ExceptionDetailsErrorDialog;
 import org.csstudio.ui.util.dnd.ControlSystemDropTarget;
+import org.eclipse.jface.action.IMenuManager;
+import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.window.Window;
 import org.eclipse.osgi.util.NLS;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Shell;
 import org.epics.vtype.VType;
 
@@ -64,12 +68,15 @@ public class WaveformSnapshotViewer {
 	private Shell shell;
 	private Instant currentTimestamp;
 	
+	private Composite composite;
+	
 	/**
 	 * Constructs a new viewer.
 	 * 
 	 * @param parent parent
 	 */
 	public WaveformSnapshotViewer(Composite parent) {
+	    composite = parent;
 		shell = parent.getShell();
 		plotModel = new Model();
 		plotModelListener = createPlotModelListener();
@@ -81,6 +88,8 @@ public class WaveformSnapshotViewer {
 		plot.getYAxes().get(0).setName(Messages.WaveformAmplitude);
 		plot.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
 
+        createWaveformSnapshotContextMenu(plot.getPlotControl());
+        
 		hookDragAndDrop(plot);
 	}
 
@@ -407,7 +416,33 @@ public class WaveformSnapshotViewer {
 							item.getPointSize(), item.getAxisIndex());
 					itemTraceMap.put(item, trace);
 				}
+
+			}
+			
+			@Override
+			public void itemRemoved(ModelItem item) {
+			    final Trace<Double> trace = itemTraceMap.get(item);
+		        plot.removeTrace(trace);
+		        itemTraceMap.remove(trace);
 			}
 		};
 	}
+	
+    /** Create context menu for waveform snapshot */
+    private void createWaveformSnapshotContextMenu(final Control parent) 
+    {
+        final MenuManager mm = new MenuManager();
+        mm.setRemoveAllWhenShown(true);
+        final Menu menu = mm.createContextMenu(parent);
+        parent.setMenu(menu);
+        mm.addMenuListener(this::fillSnapshotWaveformContextMenu);
+    }
+
+    /** Dynamically fill context menu
+     *  @param manager
+     */
+    private void fillSnapshotWaveformContextMenu(final IMenuManager manager) {
+        manager.add(new ShowRemoveTracesDialogAction(plot, plotModel));
+        manager.add(new ShowWaveformSnapshotAction(plot, composite));
+    }
 }

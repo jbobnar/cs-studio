@@ -4,9 +4,9 @@ import java.time.Instant;
 import java.util.List;
 
 import org.csstudio.swt.rtplot.Marker;
+import org.csstudio.swt.rtplot.RTPlot;
 import org.csstudio.trends.databrowser2.Activator;
 import org.csstudio.trends.databrowser2.Messages;
-import org.csstudio.trends.databrowser2.ui.ModelBasedPlot;
 import org.eclipse.jface.action.Action;
 import org.eclipse.swt.widgets.Composite;
 
@@ -17,7 +17,8 @@ import org.eclipse.swt.widgets.Composite;
  */
 public class ShowWaveformSnapshotAction extends Action {
 
-	private ModelBasedPlot plot;
+	@SuppressWarnings("rawtypes")
+    private RTPlot plot;
 	private Composite composite;
 	
 	/**
@@ -26,7 +27,8 @@ public class ShowWaveformSnapshotAction extends Action {
 	 * @param plot plot
 	 * @param composite composite
 	 */
-	public ShowWaveformSnapshotAction(ModelBasedPlot plot, Composite composite) {
+	@SuppressWarnings("rawtypes")
+	public ShowWaveformSnapshotAction(RTPlot plot, Composite composite) {
 		super(composite.getVisible() ? Messages.HideSnapshotViewer : Messages.ShowSnapshotViewer,
 	              composite.getVisible() ? Activator.getDefault().getImageDescriptor("icons/up.gif") : 
 	                  Activator.getDefault().getImageDescriptor("icons/down.gif"));
@@ -37,17 +39,18 @@ public class ShowWaveformSnapshotAction extends Action {
 	/* (non-Javadoc)
 	 * @see org.eclipse.jface.action.Action#run()
 	 */
+    @SuppressWarnings("unchecked")
 	@Override
 	public void run() {
 		boolean visible = !composite.getVisible();
 		if (!visible) {
 		    // remove markers if waveform snapshot viewer is not visible
-		    List<Marker<Instant>> markers = plot.getPlot().getMarkers();
+            List<Marker<Instant>> markers = plot.getMarkers();
 		    for (Marker<Instant> marker : markers) {
-		        plot.getPlot().removeMarker(marker);
+		        plot.removeMarker(marker);
 		    }
 		}
-		plot.getPlot().showCrosshair(visible);
+		plot.showCrosshair(visible);
 		composite.setVisible(visible);
 		composite.getParent().layout();
 	}

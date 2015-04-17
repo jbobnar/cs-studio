@@ -17,14 +17,17 @@ import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Table;
 
 /**
- * <class>RemoveMarkersDialog</class> provides dialog which allows removeing
+ * <class>RemoveMarkersDialog</class> provides dialog which allows removing
  * selected markers from the plot.
  * 
  * @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a>
  *
  */
 public class RemoveMarkersDialog extends Dialog{
-
+    
+    private static final int WIDTH = 300;
+    private static final int HEIGHT = 300;
+    
     private RTTimePlot plot;
     private CheckboxTableViewer markerTable;
     
@@ -46,7 +49,7 @@ public class RemoveMarkersDialog extends Dialog{
     protected void configureShell(Shell shell) {
         super.configureShell(shell);
         shell.setText(Messages.RemoveMarkers);
-        shell.setSize(300, 300);
+        shell.setSize(WIDTH, HEIGHT);
     }
     
     /* (non-Javadoc)

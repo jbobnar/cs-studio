@@ -332,7 +332,6 @@ public class DataBrowserEditor extends EditorPart
         onSelectionShowWaveform(sampleIndexSlider);
         
         waveformSnapshotViewer = new WaveformSnapshotViewer(waveformSnapshotComposite);  
-        createWaveformSnapshotContextMenu(waveformSnapshotViewer.getPlot().getPlotControl());
         
         plot.getPlot().getPlotControl().addControlListener(new ControlListener() {
 			
@@ -405,24 +404,6 @@ public class DataBrowserEditor extends EditorPart
         createContextMenu(plot.getPlot().getPlotControl());
     }
     
-    /** Create context menu for waveform snapshot */
-    private void createWaveformSnapshotContextMenu(final Control parent) 
-    {
-        final MenuManager mm = new MenuManager();
-        mm.setRemoveAllWhenShown(true);
-        final Menu menu = mm.createContextMenu(parent);
-        parent.setMenu(menu);
-        mm.addMenuListener(this::fillSnapshotWaveformContextMenu);
-    }
-
-    /** Dynamically fill context menu
-     *  @param manager
-     */
-    private void fillSnapshotWaveformContextMenu(final IMenuManager manager) {
-        manager.add(new ShowWaveformSnapshotAction(plot, waveformSnapshotComposite));
-    }
-
-
     /** Create context menu */
     private void createContextMenu(final Control parent)
     {
@@ -500,7 +481,7 @@ public class DataBrowserEditor extends EditorPart
         }
         manager.add(new Separator());
         manager.add(new ShowRemoveMarkersDialogAction(plot));
-		manager.add(new ShowWaveformSnapshotAction(plot, waveformSnapshotComposite));
+		manager.add(new ShowWaveformSnapshotAction(plot.getPlot(), waveformSnapshotComposite));
 
     }
 
@@ -650,7 +631,7 @@ public class DataBrowserEditor extends EditorPart
 			public void mouseDoubleClick(MouseEvent e) {
 				if (model.getItems().iterator().hasNext()) {
 				    if (!waveformSnapshotComposite.isVisible()) {
-				        new ShowWaveformSnapshotAction(plot, waveformSnapshotComposite).run();
+				        new ShowWaveformSnapshotAction(plot.getPlot(), waveformSnapshotComposite).run();
 				    }
 					Instant position = calculatePosition(plot.getPlot().getXAxis().getValue(e.x));
 					Marker<Instant> marker = new Marker<Instant>(position);
