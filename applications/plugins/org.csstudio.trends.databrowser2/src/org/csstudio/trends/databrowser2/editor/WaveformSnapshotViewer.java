@@ -63,7 +63,7 @@ public class WaveformSnapshotViewer {
 
 	private Shell shell;
 	private Instant currentTimestamp;
-
+	
 	/**
 	 * Constructs a new viewer.
 	 * 

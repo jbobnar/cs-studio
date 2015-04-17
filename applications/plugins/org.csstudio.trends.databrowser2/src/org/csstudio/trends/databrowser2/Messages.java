@@ -212,6 +212,8 @@ public class Messages extends NLS
     public static String RegularExpression;
     public static String RegularExpressionTT;
     public static String RemoveEmptyAxes;
+    public static String RemoveMarkers;
+    public static String RemoveTraces;
     public static String ReplaceSearchResults;
     public static String ReplaceSearchResultsTT;
     public static String Request_optimized;

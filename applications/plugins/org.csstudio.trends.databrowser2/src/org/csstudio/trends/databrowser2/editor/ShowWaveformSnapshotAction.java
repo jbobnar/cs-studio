@@ -1,5 +1,9 @@
 package org.csstudio.trends.databrowser2.editor;
 
+import java.time.Instant;
+import java.util.List;
+
+import org.csstudio.swt.rtplot.Marker;
 import org.csstudio.trends.databrowser2.Activator;
 import org.csstudio.trends.databrowser2.Messages;
 import org.csstudio.trends.databrowser2.ui.ModelBasedPlot;
@@ -24,7 +28,8 @@ public class ShowWaveformSnapshotAction extends Action {
 	 */
 	public ShowWaveformSnapshotAction(ModelBasedPlot plot, Composite composite) {
 		super(composite.getVisible() ? Messages.HideSnapshotViewer : Messages.ShowSnapshotViewer,
-	              Activator.getDefault().getImageDescriptor("icons/add.gif"));
+	              composite.getVisible() ? Activator.getDefault().getImageDescriptor("icons/up.gif") : 
+	                  Activator.getDefault().getImageDescriptor("icons/down.gif"));
 		this.composite = composite;
 		this.plot = plot;
 	}
@@ -35,6 +40,13 @@ public class ShowWaveformSnapshotAction extends Action {
 	@Override
 	public void run() {
 		boolean visible = !composite.getVisible();
+		if (!visible) {
+		    // remove markers if waveform snapshot viewer is not visible
+		    List<Marker<Instant>> markers = plot.getPlot().getMarkers();
+		    for (Marker<Instant> marker : markers) {
+		        plot.getPlot().removeMarker(marker);
+		    }
+		}
 		plot.getPlot().showCrosshair(visible);
 		composite.setVisible(visible);
 		composite.getParent().layout();
