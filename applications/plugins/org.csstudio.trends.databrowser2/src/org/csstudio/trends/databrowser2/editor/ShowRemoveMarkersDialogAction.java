@@ -12,7 +12,7 @@ import org.eclipse.jface.action.Action;
  * 
  * @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a>
  */
-public class ShowRemoveMarkersDialog extends Action {
+public class ShowRemoveMarkersDialogAction extends Action {
 
     private ModelBasedPlot plot;
     
@@ -21,7 +21,7 @@ public class ShowRemoveMarkersDialog extends Action {
      * 
      * @param plot plot
      */
-    public ShowRemoveMarkersDialog(ModelBasedPlot plot) {
+    public ShowRemoveMarkersDialogAction(ModelBasedPlot plot) {
         super(Messages.RemoveMarkers, Activator.getDefault()
                 .getImageDescriptor("icons/remove_unused.gif"));
         this.plot = plot;

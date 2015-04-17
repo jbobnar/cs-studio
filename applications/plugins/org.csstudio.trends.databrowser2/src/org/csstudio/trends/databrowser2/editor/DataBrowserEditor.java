@@ -499,7 +499,7 @@ public class DataBrowserEditor extends EditorPart
                 manager.add(new SendToElogAction(shell, plot.getPlot()));
         }
         manager.add(new Separator());
-        manager.add(new ShowRemoveMarkersDialog(plot));
+        manager.add(new ShowRemoveMarkersDialogAction(plot));
 		manager.add(new ShowWaveformSnapshotAction(plot, waveformSnapshotComposite));
 
     }
