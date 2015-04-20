@@ -15,6 +15,7 @@ import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.viewers.ArrayContentProvider;
 import org.eclipse.jface.viewers.CheckboxTableViewer;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
@@ -48,6 +49,17 @@ public class RemoveTracesDialog extends Dialog {
         super(plot.getShell());
         this.plot = plot;
         this.model = model;
+    }
+    
+    /* (non-Javadoc)
+     * @see org.eclipse.jface.dialogs.Dialog#initializeBounds()
+     */
+    @Override
+    protected void initializeBounds() {
+        super.initializeBounds();
+        Rectangle bounds = getShell().getMonitor().getBounds ();
+        getShell().setBounds(bounds.x + (bounds.width - WIDTH) / 2, 
+                bounds.y + (bounds.height - HEIGHT) / 2, WIDTH, HEIGHT);
     }
     
     /* (non-Javadoc)

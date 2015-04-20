@@ -9,6 +9,7 @@ import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.viewers.ArrayContentProvider;
 import org.eclipse.jface.viewers.CheckboxTableViewer;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
@@ -43,13 +44,23 @@ public class RemoveMarkersDialog extends Dialog{
     }
     
     /* (non-Javadoc)
+     * @see org.eclipse.jface.dialogs.Dialog#initializeBounds()
+     */
+    @Override
+    protected void initializeBounds() {
+        super.initializeBounds();
+        Rectangle bounds = getShell().getMonitor().getBounds ();
+        getShell().setBounds(bounds.x + (bounds.width - WIDTH) / 2, 
+                bounds.y + (bounds.height - HEIGHT) / 2, WIDTH, HEIGHT);
+    }
+    
+    /* (non-Javadoc)
      * @see org.eclipse.jface.window.Window#configureShell(org.eclipse.swt.widgets.Shell)
      */
     @Override
     protected void configureShell(Shell shell) {
         super.configureShell(shell);
         shell.setText(Messages.RemoveMarkers);
-        shell.setSize(WIDTH, HEIGHT);
     }
     
     /* (non-Javadoc)
