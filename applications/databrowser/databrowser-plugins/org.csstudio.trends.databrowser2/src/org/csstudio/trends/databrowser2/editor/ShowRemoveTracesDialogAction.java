@@ -8,13 +8,12 @@ import org.csstudio.trends.databrowser2.ui.RemoveTracesDialog;
 import org.eclipse.jface.action.Action;
 
 /**
- * <code>ShowRemoveTracesDialogAction</code> displays dialog which allows removing
- * traces from the plot.
+ * <code>ShowRemoveTracesDialogAction</code> displays dialog which allows removing traces from the plot.
  * 
  * @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a>
  */
 public class ShowRemoveTracesDialogAction extends Action {
-    
+
     private RTValuePlot plot;
     private Model model;
 
@@ -25,13 +24,13 @@ public class ShowRemoveTracesDialogAction extends Action {
      * @param model model
      */
     public ShowRemoveTracesDialogAction(RTValuePlot plot, Model model) {
-        super(Messages.RemoveTraces, Activator.getDefault().getImageDescriptor(
-                "icons/remove_unused.gif"));
+        super(Messages.RemoveTraces, Activator.getDefault().getImageDescriptor("icons/remove_unused.gif"));
         this.plot = plot;
         this.model = model;
     }
-    
-    /* (non-Javadoc)
+
+    /*
+     * (non-Javadoc)
      * @see org.eclipse.jface.action.Action#run()
      */
     @Override

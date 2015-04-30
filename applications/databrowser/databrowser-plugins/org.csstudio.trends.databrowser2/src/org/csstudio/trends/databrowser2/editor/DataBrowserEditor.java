@@ -11,6 +11,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.logging.Level;
 
 import org.csstudio.apputil.ui.workbench.OpenViewAction;
@@ -62,8 +64,8 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.SashForm;
 import org.eclipse.swt.events.ControlEvent;
 import org.eclipse.swt.events.ControlListener;
+import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
-import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.layout.GridData;
@@ -104,6 +106,8 @@ public class DataBrowserEditor extends EditorPart
     /** Editor ID (same ID as original Data Browser) registered in plugin.xml */
     final public static String ID = "org.csstudio.trends.databrowser.ploteditor.PlotEditor"; //$NON-NLS-1$
     
+    final private static ExecutorService executor = Executors.newWorkStealingPool();
+    
     /** Data model */
     private Model model;
 
@@ -128,7 +132,7 @@ public class DataBrowserEditor extends EditorPart
     private WaveformSnapshotViewer waveformSnapshotViewer;
 
     private Composite waveformSnapshotComposite;
-    
+        
     /** Create data browser editor
      *  @param input Input for editor, must be data browser config file
      *  @return DataBrowserEditor or <code>null</code> on error
@@ -307,17 +311,16 @@ public class DataBrowserEditor extends EditorPart
     /** Create Plot GUI, connect to model via Controller
      *  {@inheritDoc}
      */
-    Shell shell;
     @Override
     public void createPartControl(final Composite parent)
     {
-    	// Create GUI elements
-    	parent.setLayout(new GridLayout());
-    	
-   	 	SashForm sashForm = new SashForm(parent, SWT.VERTICAL);
-   	 	sashForm.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        // Create GUI elements
+        parent.setLayout(new GridLayout());
         
-   	 	plot = new ModelBasedPlot(sashForm);
+        SashForm sashForm = new SashForm(parent, SWT.VERTICAL);
+        sashForm.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        
+        plot = new ModelBasedPlot(sashForm);
         plot.getPlot().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
         onDoubleClickCreateMarker(plot);
         
@@ -333,16 +336,18 @@ public class DataBrowserEditor extends EditorPart
         
         waveformSnapshotViewer = new WaveformSnapshotViewer(waveformSnapshotComposite);  
         
-        plot.getPlot().getPlotControl().addControlListener(new ControlListener() {
-			
-			@Override
-			public void controlResized(ControlEvent e) {
-				setSliderRange();
-			}
-			
-			@Override
-			public void controlMoved(ControlEvent e) {
-			}
+        plot.getPlot().getPlotControl().addControlListener(new ControlListener() 
+        {
+            @Override
+            public void controlResized(ControlEvent e)
+            {
+                setSliderRange();
+            }
+            
+            @Override
+            public void controlMoved(ControlEvent e)
+            {
+            }
         });
         
         // Create and start controller
@@ -481,7 +486,7 @@ public class DataBrowserEditor extends EditorPart
         }
         manager.add(new Separator());
         manager.add(new ShowRemoveMarkersDialogAction(plot));
-		manager.add(new ShowWaveformSnapshotAction(plot.getPlot(), waveformSnapshotComposite));
+        manager.add(new ShowWaveformSnapshotAction(plot.getPlot(), waveformSnapshotComposite));
 
     }
 
@@ -610,110 +615,123 @@ public class DataBrowserEditor extends EditorPart
         setDirty(false);
     }
     
-	/**
-	 * Adds mouse listener to the model based plot. On double click creates
-	 * marker on the plot.
-	 * 
-	 * @param plot model based plot
-	 */
+    /**
+     * Adds mouse listener to the model based plot. On double click creates
+     * marker on the plot.
+     * 
+     * @param plot model based plot
+     */
     private void onDoubleClickCreateMarker(ModelBasedPlot plot) {
-    	plot.getPlot().getPlotControl().addMouseListener(new MouseListener() {
-			
-			@Override
-			public void mouseUp(MouseEvent e) {
-			}
-			
-			@Override
-			public void mouseDown(MouseEvent e) {
-			}
-			
-			@Override
-			public void mouseDoubleClick(MouseEvent e) {
-				if (model.getItems().iterator().hasNext()) {
-				    if (!waveformSnapshotComposite.isVisible()) {
-				        new ShowWaveformSnapshotAction(plot.getPlot(), waveformSnapshotComposite).run();
-				    }
-					Instant position = plot.getPlot().getXAxis().getValue(e.x);
-					Marker<Instant> marker = new Marker<Instant>(position);
-					if (plot.getPlot().getMarkers().isEmpty()) {
-						plot.getPlot().addMarker(marker);
-					} else {
-						plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), position);
-					}
-					waveformSnapshotViewer.retrieveSample(position);
-					setSliderRange();
-					sampleIndexSlider.setSelection(plot.getPlot().getXAxis().getScreenCoord(position));
-				}
-			}
-		});
+        plot.getPlot().getPlotControl().addMouseListener(new MouseAdapter() 
+        {
+        	@Override
+            public void mouseDoubleClick(MouseEvent e) 
+        	{
+                if (model.getItems().iterator().hasNext()) 
+                {
+                    if (!waveformSnapshotComposite.isVisible()) 
+                        new ShowWaveformSnapshotAction(plot.getPlot(), waveformSnapshotComposite).run();
+                    Instant position = plot.getPlot().getXAxis().getValue(e.x);
+                    Marker<Instant> marker = new Marker<Instant>(position);
+                    if (plot.getPlot().getMarkers().isEmpty()) 
+                        plot.getPlot().addMarker(marker);
+                    else 
+                        plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), position);
+                    waveformSnapshotViewer.retrieveSample(position);
+                    setSliderRange();
+                    sampleIndexSlider.setSelection(plot.getPlot().getXAxis().getScreenCoord(position));
+                }
+            }
+        });
     }
     
-	/**
-	 * Returns sample which is closer to the current marker.
-	 * 
-	 * @param sample1 sample1
-	 * @param sample2 sample2
-	 * @param x timestamp
-	 * 
-	 * @return sample which is closer to the current marker.
-	 */
-	private PlotSample getBetterSample(PlotSample sample1, PlotSample sample2, Instant x) {
-		if (sample1 == null) {
-			return sample2;
-		} else {
-			long diff1 = sample1.getPosition().toEpochMilli() - x.toEpochMilli();
-			long diff2 = sample2.getPosition().toEpochMilli() - x.toEpochMilli();
-			if (diff1 > diff2) {
-				return sample2;
-			}
-		}
-		return sample1;
-	}
+
     
-	/**
-	 * Adds selection listner to the slider.
-	 * 
-	 * @param slider slider
-	 */
-    private void onSelectionShowWaveform(Slider slider) {
-        slider.addSelectionListener(new SelectionAdapter() {
-        	
+    /**
+     * Adds selection listener to the slider.
+     * 
+     * @param slider slider
+     */
+    private void onSelectionShowWaveform(Slider slider) 
+    {
+        slider.addSelectionListener(new SelectionAdapter() 
+        {
             @Override
-            public void widgetSelected(SelectionEvent e) {
-                if (!plot.getPlot().getMarkers().isEmpty()) {
-            		Instant x = plot.getPlot().getXAxis().getValue(slider.getSelection());
-                    new Thread(() -> {
+            public void widgetSelected(SelectionEvent e) 
+            {
+                if (!plot.getPlot().getMarkers().isEmpty())
+                {
+                    Instant x = plot.getPlot().getXAxis().getValue(slider.getSelection());
+                    executor.execute(() -> 
+                    {
                         PlotSample item = null;
-                        for (ModelItem modelItem : model.getItems()) {
+                        for (ModelItem modelItem : model.getItems())
+                        {
                             PlotSamples samples = modelItem.getSamples();
-                            int index = plotSearch.findSampleLessOrEqual(samples, x);
-                            if (index != -1) {
-                                item = getBetterSample(item, samples.get(index), x);
+                            samples.getLock().lock();
+                            try 
+                            {
+                            	int index = plotSearch.findSampleLessOrEqual(samples, x);
+                            	if (index != -1)
+                                     item = getBetterSample(item, samples.get(index), x);
+                            } 
+                            finally
+                            {
+                            	samples.getLock().unlock();
                             }
+                           
                         }
-                        if (item != null) {
+                        if (item != null) 
+                        {
                             final Instant position = item.getPosition();
-                            Display.getDefault().syncExec(() -> {
+                            Display.getDefault().syncExec(() ->
+                            {
                                 plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), position);
                                 waveformSnapshotViewer.retrieveSample(position);
                             });
                         }
-                    }).start();
+                    });
                 }
             }
         });
     }
     
     /**
+     * Returns sample which is closer to the current marker.
+     * 
+     * @param sample1 sample1
+     * @param sample2 sample2
+     * @param x timestamp
+     * 
+     * @return sample which is closer to the current marker.
+     */
+    private PlotSample getBetterSample(PlotSample sample1, PlotSample sample2, Instant x) 
+    {
+        if (sample1 == null) 
+        {
+            return sample2;
+        } 
+        else
+        {
+            long diff1 = sample1.getPosition().toEpochMilli() - x.toEpochMilli();
+            long diff2 = sample2.getPosition().toEpochMilli() - x.toEpochMilli();
+            if (diff1 > diff2) 
+                return sample2;
+        }
+        return sample1;
+    }
+    
+    /**
      * Sets slider range.
      */
-    private void setSliderRange() {
-		Instant min = plot.getPlot().getXAxis().getValueRange().getLow();
-		Instant max = plot.getPlot().getXAxis().getValueRange().getHigh();
-		int x1 = plot.getPlot().getXAxis().getScreenCoord(min);
-		int x2 = plot.getPlot().getXAxis().getScreenCoord(max);
-		sampleIndexSlider.setMinimum(x1);
-		sampleIndexSlider.setMaximum(x2);
-		sampleIndexSlider.setPageIncrement(1);
+    private void setSliderRange() 
+    {
+        Instant min = plot.getPlot().getXAxis().getValueRange().getLow();
+        Instant max = plot.getPlot().getXAxis().getValueRange().getHigh();
+        int x1 = plot.getPlot().getXAxis().getScreenCoord(min);
+        int x2 = plot.getPlot().getXAxis().getScreenCoord(max);
+        sampleIndexSlider.setMinimum(x1);
+        sampleIndexSlider.setMaximum(x2);
+        sampleIndexSlider.setPageIncrement(1);
     }
 }

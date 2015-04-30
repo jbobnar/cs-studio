@@ -110,7 +110,6 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
         //
         // For now, main point is that this happens in non-UI thread,
         // so the slower the better to test UI responsiveness.
-//        final PlotDataProvider<XTYPE> data = trace.getData();
         data.getLock().lock();
         PlotDataProvider<XTYPE> reducedData = data.size() > 0 ? getReducedDataProvider(data, x_axis, y_axis) : data;
         try
@@ -511,7 +510,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
 	    min.clear();
 	    max.clear();
 	}
-	
+
     /**
      * Reduce data provider data.
      * 
@@ -521,49 +520,54 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      * 
      * @return reduced data list.
      */
-	private List<PlotDataItem<XTYPE>> reduction(final PlotDataProvider<XTYPE> data, final AxisPart<XTYPE> x_axis, final YAxisImpl<XTYPE> y_axis) {
-	    final ScreenTransform<XTYPE> x_transform = x_axis.getScreenTransform();
-	    List<PlotDataItem<XTYPE>> reducedList = new ArrayList<PlotDataItem<XTYPE>>();
-	    
-	    // find first and last visible item
-	    PlotDataSearch<XTYPE> search = new PlotDataSearch<XTYPE>();
-		int startIndex = search.findSampleGreaterOrEqual(data, x_axis.range.getLow());
-		int endIndex = search.findSampleLessOrEqual(data, x_axis.range.getHigh());
-		
-		startIndex = startIndex != -1 ? startIndex : 0;
-		endIndex = endIndex != -1 ? endIndex : data.size();
-		
-		// find first item which value is not NaN
-		int x0 = -1;
-		double val0 = Double.NaN;
-		do {
-		    PlotDataItem<XTYPE> item = data.get(startIndex);
-		    reducedList.add(item);
-		    x0 = (int) x_transform.transform(item.getPosition());
-		    val0 = item.getValue();
-		    startIndex ++;
-		} while (Double.isNaN(val0) && startIndex != endIndex);
-		int y0 = (int) y_axis.getScreenCoord(val0);
-		
-		// reduce data
-		for (int i = startIndex; i < endIndex + 1; i++) {
-		    PlotDataItem<XTYPE> item = data.get(i);
-		    int x1 = (int) x_transform.transform(item.getPosition());
-		    double val1 = item.getValue();
-		    if (Double.isNaN(val1)) {
-		        reducedList.add(item);
-		    } else {
-		        int y1 = (int) y_axis.getScreenCoord(val1);
-	              if ((x0 - x1 > REDUCTION_DISTANCE || x1 - x0 > REDUCTION_DISTANCE)
-	                        && (y0 - y1 > REDUCTION_DISTANCE || y1 - y0 > REDUCTION_DISTANCE)) {
-	                  reducedList.add(item);
-	                  x0 = x1; 
-	                  y0 = y1;
-	              }
-		    }
-		}
-		return reducedList;
-	}
+    private List<PlotDataItem<XTYPE>> reduction(final PlotDataProvider<XTYPE> data, final AxisPart<XTYPE> x_axis,
+            final YAxisImpl<XTYPE> y_axis)
+    {
+        final ScreenTransform<XTYPE> x_transform = x_axis.getScreenTransform();
+        List<PlotDataItem<XTYPE>> reducedList = new ArrayList<PlotDataItem<XTYPE>>();
+
+        // find first and last visible item
+        PlotDataSearch<XTYPE> search = new PlotDataSearch<XTYPE>();
+        int startIndex = search.findSampleGreaterOrEqual(data, x_axis.range.getLow());
+        int endIndex = search.findSampleLessOrEqual(data, x_axis.range.getHigh());
+
+        startIndex = startIndex != -1 ? startIndex : 0;
+        endIndex = endIndex != -1 ? endIndex : data.size();
+
+        // find first item which value is not NaN
+        int x0 = -1;
+        double val0 = Double.NaN;
+        do {
+            PlotDataItem<XTYPE> item = data.get(startIndex);
+            reducedList.add(item);
+            x0 = (int) x_transform.transform(item.getPosition());
+            val0 = item.getValue();
+            startIndex++;
+        } while (Double.isNaN(val0) && startIndex != endIndex);
+        int y0 = (int) y_axis.getScreenCoord(val0);
+
+        // reduce data
+        for (int i = startIndex; i < endIndex + 1; i++) 
+        {
+            PlotDataItem<XTYPE> item = data.get(i);
+            int x1 = (int) x_transform.transform(item.getPosition());
+            double val1 = item.getValue();
+            if (Double.isNaN(val1))
+                reducedList.add(item);
+            else 
+            {
+                int y1 = (int) y_axis.getScreenCoord(val1);
+                if ((x0 - x1 > REDUCTION_DISTANCE || x1 - x0 > REDUCTION_DISTANCE)
+                        && (y0 - y1 > REDUCTION_DISTANCE || y1 - y0 > REDUCTION_DISTANCE)) 
+                {
+                    reducedList.add(item);
+                    x0 = x1;
+                    y0 = y1;
+                }
+            }
+        }
+        return reducedList;
+    }
 	
 	/**
 	 * Returns reduced data provider.
@@ -574,24 +578,29 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
 	 * 
 	 * @return reduced data provider.
 	 */
-	private PlotDataProvider<XTYPE> getReducedDataProvider(final PlotDataProvider<XTYPE> data, final AxisPart<XTYPE> x_axis, final YAxisImpl<XTYPE> y_axis) {
-		List<PlotDataItem<XTYPE>> reducedDataList = reduction(data, x_axis, y_axis);
-        return new PlotDataProvider<XTYPE>() {
-
-			@Override
-			public Lock getLock() {
-				return data.getLock();
-			}
-
-			@Override
-			public int size() {
-				return reducedDataList.size();
-			}
-
-			@Override
-			public PlotDataItem<XTYPE> get(int index) {
-				return reducedDataList.get(index);
-			}
-		};
-	}
+    private PlotDataProvider<XTYPE> getReducedDataProvider(final PlotDataProvider<XTYPE> data,
+            final AxisPart<XTYPE> x_axis, final YAxisImpl<XTYPE> y_axis)
+    {
+        List<PlotDataItem<XTYPE>> reducedDataList = reduction(data, x_axis, y_axis);
+        return new PlotDataProvider<XTYPE>()
+            {
+                @Override
+                public Lock getLock() 
+                {
+                    return data.getLock();
+                }
+    
+                @Override
+                public int size() 
+                {
+                    return reducedDataList.size();
+                }
+    
+                @Override
+                public PlotDataItem<XTYPE> get(int index)
+                {
+                    return reducedDataList.get(index);
+                }
+            };
+    }
 }

@@ -357,12 +357,14 @@ public class RTPlot<XTYPE extends Comparable<XTYPE>> extends Composite
      * 
      * @param marker marker to add
      */
-    public void addMarker(final Marker<XTYPE> marker) {
+    public void addMarker(final Marker<XTYPE> marker)
+    {
         plot.addMarker(marker);
     }
 
     /** @return list of markers, which are shown on plot. */
-    public List<Marker<XTYPE>> getMarkers() {
+    public List<Marker<XTYPE>> getMarkers() 
+    {
         return Collections.unmodifiableList(plot.getMarkers());
     }
 
@@ -374,7 +376,8 @@ public class RTPlot<XTYPE extends Comparable<XTYPE>> extends Composite
      * @param position new marker position on plot
      * @throws IllegalArgumentException if marker is unknown
      */
-    public void updateMarker(final Marker<XTYPE> marker, final XTYPE position) {
+    public void updateMarker(final Marker<XTYPE> marker, final XTYPE position)
+    {
         plot.updateMarker(marker, position);
     }
 
@@ -382,7 +385,8 @@ public class RTPlot<XTYPE extends Comparable<XTYPE>> extends Composite
      * @param marker
      *            marker to remove from the markers list
      */
-    public void removeMarker(final Marker<XTYPE> marker) {
+    public void removeMarker(final Marker<XTYPE> marker)
+    {
         plot.removeMarker(marker);
     }
 }

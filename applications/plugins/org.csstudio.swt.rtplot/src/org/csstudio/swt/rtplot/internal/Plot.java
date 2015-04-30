@@ -520,25 +520,35 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
         }
     }
     
-    /** @param marker marker to add in the markers list */
+    /**
+     * Add a new marker to the plot. 
+     * @param marker marker to add in the markers list 
+     */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-	public void addMarker(final Marker<XTYPE> marker) {
-    	Objects.requireNonNull(marker);
-    	if (marker instanceof MarkerImpl)
-    		markers.add((MarkerImpl) marker);
-    	else
-    		markers.add(new MarkerImpl<XTYPE>(marker.getPosition()));
-    	requestUpdate();
+    public void addMarker(final Marker<XTYPE> marker) 
+    {
+        Objects.requireNonNull(marker);
+        if (marker instanceof MarkerImpl)
+            markers.add((MarkerImpl) marker);
+        else
+            markers.add(new MarkerImpl<XTYPE>(marker.getPosition()));
+        requestUpdate();
     }
     
     /** @return Current {@link MarkerImpl}s */
-    public List<MarkerImpl<XTYPE>> getMarkers() {
-    	return markers;
+    public List<MarkerImpl<XTYPE>> getMarkers() 
+    {
+        return markers;
     }
     
-    /** @param marker marker to remove from the markers list */
-    public void removeMarker(final Marker<XTYPE> marker) {
-    	markers.remove(marker);
+    /**
+     * Remove the marker from this plot.
+     *  
+     * @param marker marker to remove from the markers list 
+     */
+    public void removeMarker(final Marker<XTYPE> marker) 
+    {
+        markers.remove(marker);
         requestUpdate();
     }
     
@@ -550,8 +560,9 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
      * @param position new marker position
      * @throws IllegalArgumentException if marker is unknown
      */
-    public void updateMarker(final Marker<XTYPE> marker, final XTYPE position) {
-    	final int index = markers.indexOf(marker);
+    public void updateMarker(final Marker<XTYPE> marker, final XTYPE position)
+    {
+        final int index = markers.indexOf(marker);
         if (index < 0)
             throw new IllegalArgumentException("Unknown marker " + marker);
         markers.get(index).setPosition(position);
@@ -642,7 +653,7 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
 
         // Markers
         for (MarkerImpl<XTYPE> marker : markers)
-        	marker.paint(gc, media, plot_area.getBounds(), x_axis);
+            marker.paint(gc, media, plot_area.getBounds(), x_axis);
         
         gc.dispose();
 
