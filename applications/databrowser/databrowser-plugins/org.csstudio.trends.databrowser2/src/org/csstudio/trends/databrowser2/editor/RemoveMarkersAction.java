@@ -1,9 +1,11 @@
 package org.csstudio.trends.databrowser2.editor;
 
+import java.time.Instant;
+
+import org.csstudio.swt.rtplot.Marker;
 import org.csstudio.trends.databrowser2.Activator;
 import org.csstudio.trends.databrowser2.Messages;
 import org.csstudio.trends.databrowser2.ui.ModelBasedPlot;
-import org.csstudio.trends.databrowser2.ui.RemoveMarkersDialog;
 import org.eclipse.jface.action.Action;
 
 /**
@@ -11,7 +13,7 @@ import org.eclipse.jface.action.Action;
  * 
  * @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a>
  */
-public class ShowRemoveMarkersDialogAction extends Action {
+public class RemoveMarkersAction extends Action {
 
     private ModelBasedPlot plot;
 
@@ -20,7 +22,7 @@ public class ShowRemoveMarkersDialogAction extends Action {
      * 
      * @param plot plot
      */
-    public ShowRemoveMarkersDialogAction(ModelBasedPlot plot) {
+    public RemoveMarkersAction(ModelBasedPlot plot) {
         super(Messages.RemoveMarkers, Activator.getDefault().getImageDescriptor("icons/remove_unused.gif"));
         this.plot = plot;
     }
@@ -31,6 +33,8 @@ public class ShowRemoveMarkersDialogAction extends Action {
      */
     @Override
     public void run() {
-        new RemoveMarkersDialog(plot.getPlot().getShell(), plot.getPlot()).open();
+        for (Marker<Instant> m : plot.getPlot().getMarkers()) {
+            plot.getPlot().removeMarker(m);
+        }
     }
 }

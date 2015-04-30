@@ -11,14 +11,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Instant;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.logging.Level;
 
 import org.csstudio.apputil.ui.workbench.OpenViewAction;
 import org.csstudio.email.EMailSender;
 import org.csstudio.swt.rtplot.Marker;
-import org.csstudio.swt.rtplot.data.PlotDataSearch;
 import org.csstudio.swt.rtplot.undo.UndoableActionManager;
 import org.csstudio.trends.databrowser2.Activator;
 import org.csstudio.trends.databrowser2.Messages;
@@ -31,8 +28,6 @@ import org.csstudio.trends.databrowser2.model.ModelItem;
 import org.csstudio.trends.databrowser2.model.ModelListener;
 import org.csstudio.trends.databrowser2.model.ModelListenerAdapter;
 import org.csstudio.trends.databrowser2.model.PVItem;
-import org.csstudio.trends.databrowser2.model.PlotSample;
-import org.csstudio.trends.databrowser2.model.PlotSamples;
 import org.csstudio.trends.databrowser2.persistence.XMLPersistence;
 import org.csstudio.trends.databrowser2.preferences.Preferences;
 import org.csstudio.trends.databrowser2.propsheet.DataBrowserPropertySheetPage;
@@ -106,8 +101,6 @@ public class DataBrowserEditor extends EditorPart
     /** Editor ID (same ID as original Data Browser) registered in plugin.xml */
     final public static String ID = "org.csstudio.trends.databrowser.ploteditor.PlotEditor"; //$NON-NLS-1$
     
-    final private static ExecutorService executor = Executors.newWorkStealingPool();
-    
     /** Data model */
     private Model model;
 
@@ -125,10 +118,7 @@ public class DataBrowserEditor extends EditorPart
     
     /** Slider for selecting samples */
     private Slider sampleIndexSlider;
-    
-    /** Plot search */
-    private PlotDataSearch<Instant> plotSearch;
-    
+        
     private WaveformSnapshotViewer waveformSnapshotViewer;
 
     private Composite waveformSnapshotComposite;
@@ -294,8 +284,6 @@ public class DataBrowserEditor extends EditorPart
             {   setDirty(true);   }
         };
         model.addListener(model_listener);
-        
-        plotSearch = new PlotDataSearch<Instant>();
     }
 
     /** Provide custom property sheet for this editor */
@@ -332,9 +320,21 @@ public class DataBrowserEditor extends EditorPart
         sampleIndexSlider = new Slider(waveformSnapshotComposite, SWT.HORIZONTAL);
         sampleIndexSlider.setToolTipText(Messages.WaveformTimeSelector);
         sampleIndexSlider.setLayoutData(new GridData(SWT.FILL, SWT.DEFAULT, false, false, 1, 1));
-        onSelectionShowWaveform(sampleIndexSlider);
+        sampleIndexSlider.addSelectionListener(new SelectionAdapter() 
+        {
+            @Override
+            public void widgetSelected(SelectionEvent e) 
+            {
+                if (!plot.getPlot().getMarkers().isEmpty())
+                {
+                    Instant x = plot.getPlot().getXAxis().getValue(sampleIndexSlider.getSelection());
+                    plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), x);
+                    waveformSnapshotViewer.retrieveSample(x);
+                }
+            }
+        });
         
-        waveformSnapshotViewer = new WaveformSnapshotViewer(waveformSnapshotComposite);  
+        waveformSnapshotViewer = new WaveformSnapshotViewer(waveformSnapshotComposite,plot.getPlot());  
         
         plot.getPlot().getPlotControl().addControlListener(new ControlListener() 
         {
@@ -485,7 +485,7 @@ public class DataBrowserEditor extends EditorPart
                 manager.add(new SendToElogAction(shell, plot.getPlot()));
         }
         manager.add(new Separator());
-        manager.add(new ShowRemoveMarkersDialogAction(plot));
+        manager.add(new RemoveMarkersAction(plot));
         manager.add(new ShowWaveformSnapshotAction(plot.getPlot(), waveformSnapshotComposite));
 
     }
@@ -627,10 +627,8 @@ public class DataBrowserEditor extends EditorPart
         	@Override
             public void mouseDoubleClick(MouseEvent e) 
         	{
-                if (model.getItems().iterator().hasNext()) 
+                if (waveformSnapshotComposite.isVisible() && model.getItems().iterator().hasNext()) 
                 {
-                    if (!waveformSnapshotComposite.isVisible()) 
-                        new ShowWaveformSnapshotAction(plot.getPlot(), waveformSnapshotComposite).run();
                     Instant position = plot.getPlot().getXAxis().getValue(e.x);
                     Marker<Instant> marker = new Marker<Instant>(position);
                     if (plot.getPlot().getMarkers().isEmpty()) 
@@ -644,83 +642,7 @@ public class DataBrowserEditor extends EditorPart
             }
         });
     }
-    
-
-    
-    /**
-     * Adds selection listener to the slider.
-     * 
-     * @param slider slider
-     */
-    private void onSelectionShowWaveform(Slider slider) 
-    {
-        slider.addSelectionListener(new SelectionAdapter() 
-        {
-            @Override
-            public void widgetSelected(SelectionEvent e) 
-            {
-                if (!plot.getPlot().getMarkers().isEmpty())
-                {
-                    Instant x = plot.getPlot().getXAxis().getValue(slider.getSelection());
-                    executor.execute(() -> 
-                    {
-                        PlotSample item = null;
-                        for (ModelItem modelItem : model.getItems())
-                        {
-                            PlotSamples samples = modelItem.getSamples();
-                            samples.getLock().lock();
-                            try 
-                            {
-                            	int index = plotSearch.findSampleLessOrEqual(samples, x);
-                            	if (index != -1)
-                                     item = getBetterSample(item, samples.get(index), x);
-                            } 
-                            finally
-                            {
-                            	samples.getLock().unlock();
-                            }
-                           
-                        }
-                        if (item != null) 
-                        {
-                            final Instant position = item.getPosition();
-                            Display.getDefault().syncExec(() ->
-                            {
-                                plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), position);
-                                waveformSnapshotViewer.retrieveSample(position);
-                            });
-                        }
-                    });
-                }
-            }
-        });
-    }
-    
-    /**
-     * Returns sample which is closer to the current marker.
-     * 
-     * @param sample1 sample1
-     * @param sample2 sample2
-     * @param x timestamp
-     * 
-     * @return sample which is closer to the current marker.
-     */
-    private PlotSample getBetterSample(PlotSample sample1, PlotSample sample2, Instant x) 
-    {
-        if (sample1 == null) 
-        {
-            return sample2;
-        } 
-        else
-        {
-            long diff1 = sample1.getPosition().toEpochMilli() - x.toEpochMilli();
-            long diff2 = sample2.getPosition().toEpochMilli() - x.toEpochMilli();
-            if (diff1 > diff2) 
-                return sample2;
-        }
-        return sample1;
-    }
-    
+          
     /**
      * Sets slider range.
      */

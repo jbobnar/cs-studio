@@ -93,6 +93,11 @@ public class RemoveTracesDialog extends Dialog {
         table.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 2, 1));
         traceTable.setContentProvider(new ArrayContentProvider());
         traceTable.setInput(model.getItems());
+        List<ModelItem> list = new ArrayList<>();
+        for (ModelItem i : model.getItems()) {
+            list.add(i);
+        }
+        traceTable.setCheckedElements(list.toArray());
         return composite;
     }
     

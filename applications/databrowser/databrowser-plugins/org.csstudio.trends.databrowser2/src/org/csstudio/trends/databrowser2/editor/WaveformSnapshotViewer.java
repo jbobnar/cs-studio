@@ -10,6 +10,7 @@ import java.util.Optional;
 
 import org.csstudio.archive.vtype.ArchiveVNumberArray;
 import org.csstudio.csdata.ProcessVariable;
+import org.csstudio.swt.rtplot.RTPlot;
 import org.csstudio.swt.rtplot.RTValuePlot;
 import org.csstudio.swt.rtplot.Trace;
 import org.csstudio.swt.rtplot.YAxis;
@@ -60,11 +61,11 @@ public class WaveformSnapshotViewer {
     private final Map<ModelItem, List<ArchiveFetchJob>> itemJobMap = new HashMap<>();
     private final Map<ModelItem, Trace<Double>> itemTraceMap = new HashMap<>();
 
-    private Model plotModel;
-    private ModelListener plotModelListener;
-    private RTValuePlot plot;
+    private final Model plotModel;
+    private final RTValuePlot plot;
+    private final RTPlot<Instant> parentPlot;
 
-    private Shell shell;
+    private final Shell shell;
     private Instant currentTimestamp;
 
     private Composite composite;
@@ -74,12 +75,13 @@ public class WaveformSnapshotViewer {
      * 
      * @param parent parent
      */
-    public WaveformSnapshotViewer(Composite parent) {
+    public WaveformSnapshotViewer(Composite parent, RTPlot<Instant> parentPlot) {
         composite = parent;
         shell = parent.getShell();
         plotModel = new Model();
-        plotModelListener = createPlotModelListener();
-        plotModel.addListener(plotModelListener);
+        plotModel.addListener(createPlotModelListener());
+        
+        this.parentPlot = parentPlot;
 
         plot = new RTValuePlot(parent);
 
@@ -170,8 +172,13 @@ public class WaveformSnapshotViewer {
                 new AddArchiveCommand(plot.getUndoableActionManager(), pv, archive);
             }
         } else { // Received PV name
-                 // Add the given PV to the model anyway even if the same PV
-                 // exists in the model.
+                 // Add the given PV to the model 
+            String pvname = name.getName();
+            for (ModelItem item : plotModel.getItems()) {
+                if (item.getName().equals(pvname)) {
+                    return;
+                }
+            }
             final UndoableActionManager operations_manager = plot.getUndoableActionManager();
 
             // Add to first empty axis, or create new axis
@@ -180,7 +187,6 @@ public class WaveformSnapshotViewer {
             // Add new PV
             AddModelItemCommand.forPV(shell, operations_manager, plotModel, name.getName(),
                     Preferences.getScanPeriod(), axis, archive);
-            return;
         }
     }
 
@@ -430,6 +436,6 @@ public class WaveformSnapshotViewer {
      */
     private void fillSnapshotWaveformContextMenu(final IMenuManager manager) {
         manager.add(new ShowRemoveTracesDialogAction(plot, plotModel));
-        manager.add(new ShowWaveformSnapshotAction(plot, composite));
+        manager.add(new ShowWaveformSnapshotAction(parentPlot, composite));
     }
 }
