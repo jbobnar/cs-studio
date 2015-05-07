@@ -146,6 +146,7 @@ public class Messages extends NLS
     public static String Grid;
     public static String GridLbl;
     public static String GridTT;
+    public static String HideSnapshotViewer;
     public static String HideTraceWarning;
     public static String HideTraceWarningDetail;
     public static String ImportActionFileSelectorTitleFmt;
@@ -213,6 +214,8 @@ public class Messages extends NLS
     public static String RegularExpression;
     public static String RegularExpressionTT;
     public static String RemoveEmptyAxes;
+    public static String RemoveMarkers;
+    public static String RemoveTraces;
     public static String ReplaceSearchResults;
     public static String ReplaceSearchResultsTT;
     public static String Request_optimized;
@@ -251,6 +254,7 @@ public class Messages extends NLS
     public static String ServerAlias;
     public static String SeverityColumn;
     public static String SeverityStatusFmt;
+    public static String ShowSnapshotViewer;
     public static String StartEndDialogBtn;
     public static String StartEndDialogTT;
     public static String StartTimeLbl;

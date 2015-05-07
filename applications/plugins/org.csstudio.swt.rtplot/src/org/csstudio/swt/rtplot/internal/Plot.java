@@ -29,7 +29,6 @@ import org.csstudio.swt.rtplot.Marker;
 import org.csstudio.swt.rtplot.Trace;
 import org.csstudio.swt.rtplot.YAxis;
 import org.csstudio.swt.rtplot.data.PlotDataItem;
-import org.csstudio.swt.rtplot.internal.util.ScreenTransform;
 import org.csstudio.swt.rtplot.undo.ChangeAxisRanges;
 import org.csstudio.swt.rtplot.undo.UndoableActionManager;
 import org.csstudio.swt.rtplot.undo.UpdateAnnotationAction;
@@ -117,14 +116,13 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
     final private AxisPart<XTYPE> x_axis;
     final private List<YAxisImpl<XTYPE>> y_axes = new CopyOnWriteArrayList<>();
     final private PlotPart plot_area;
+    final private TracePainter<XTYPE> trace_painter = new TracePainter<XTYPE>();
     final private List<AnnotationImpl<XTYPE>> annotations = new CopyOnWriteArrayList<>();
     final private List<MarkerImpl<XTYPE>> markers = new CopyOnWriteArrayList<>();
     final private LegendPart<XTYPE> legend;
 
     final private PlotProcessor<XTYPE> plot_processor;
     
-    private TracePainter<XTYPE> trace_painter = new TracePainter<XTYPE>();
-
     final private Runnable redraw_runnable = () ->
     {
         if (isDisposed())
@@ -557,25 +555,35 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
         }
     }
     
-    /** @param marker marker to add in the markers list */
+    /**
+     * Add a new marker to the plot. 
+     * @param marker marker to add in the markers list 
+     */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-	public void addMarker(final Marker<XTYPE> marker) {
-    	Objects.requireNonNull(marker);
-    	if (marker instanceof MarkerImpl)
-    		markers.add((MarkerImpl) marker);
-    	else
-    		markers.add(new MarkerImpl<XTYPE>(marker.getPosition()));
-    	requestUpdate();
+    public void addMarker(final Marker<XTYPE> marker) 
+    {
+        Objects.requireNonNull(marker);
+        if (marker instanceof MarkerImpl)
+            markers.add((MarkerImpl) marker);
+        else
+            markers.add(new MarkerImpl<XTYPE>(marker.getPosition()));
+        requestUpdate();
     }
     
     /** @return Current {@link MarkerImpl}s */
-    public List<MarkerImpl<XTYPE>> getMarkers() {
-    	return markers;
+    public List<MarkerImpl<XTYPE>> getMarkers() 
+    {
+        return markers;
     }
     
-    /** @param marker marker to remove from the markers list */
-    public void removeMarker(final Marker<XTYPE> marker) {
-    	markers.remove(marker);
+    /**
+     * Remove the marker from this plot.
+     *  
+     * @param marker marker to remove from the markers list 
+     */
+    public void removeMarker(final Marker<XTYPE> marker) 
+    {
+        markers.remove(marker);
         requestUpdate();
     }
     
@@ -587,13 +595,13 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
      * @param position new marker position
      * @throws IllegalArgumentException if marker is unknown
      */
-    public void updateMarker(final Marker<XTYPE> marker, final XTYPE position) {
-    	final int index = markers.indexOf(marker);
+    public void updateMarker(final Marker<XTYPE> marker, final XTYPE position)
+    {
+        final int index = markers.indexOf(marker);
         if (index < 0)
             throw new IllegalArgumentException("Unknown marker " + marker);
         markers.get(index).setPosition(position);
         requestUpdate();
-        fireAnnotationsChanged();
     }
     
     /** Compute layout of plot components */
@@ -669,7 +677,6 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
         // because X Axis tends to change from scrolling
         // while we're painting traces
         x_axis.paint(gc, media, label_font, scale_font, plot_bounds);
-        final ScreenTransform<XTYPE> x_transform = x_axis.getScreenTransform();
         for (YAxisImpl<XTYPE> y_axis : y_axes)
             y_axis.paint(gc, media, label_font, scale_font, plot_bounds);
 
@@ -678,7 +685,7 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
 
         for (YAxisImpl<XTYPE> y_axis : y_axes)
             for (Trace<XTYPE> trace : y_axis.getTraces())
-                trace_painter.paint(gc, media, plot_area.getBounds(), x_transform, y_axis, trace, trace.getData());
+                trace_painter.paint(gc, media, plot_area.getBounds(), x_axis, y_axis, trace, trace.getData());
 
         // Annotations use label font
         gc.setFont(label_font);
@@ -687,7 +694,7 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
 
         // Markers
         for (MarkerImpl<XTYPE> marker : markers)
-        	marker.paint(gc, media, plot_area.getBounds(), x_axis);
+            marker.paint(gc, media, plot_area.getBounds(), x_axis);
         
         gc.dispose();
 
@@ -1193,20 +1200,6 @@ public class Plot<XTYPE extends Comparable<XTYPE>> extends Canvas implements Pai
         plot_processor.stagger();
     }
     
-    /** @return true if smart trace painting is enabled, otherwise false */
-    public boolean isSmartTracePainting() {
-    	return trace_painter instanceof SmartTracePainter;
-    }
-    
-    /** @param isSmartTracePainting smart trace painting */
-    public void setSmartTracePainting(boolean isSmartTracePainting) {
-    	if (isSmartTracePainting) {
-    		trace_painter = new SmartTracePainter<XTYPE>();
-    	} else {
-    		trace_painter = new TracePainter<XTYPE>();
-    	}
-    }
-
     /** Notify listeners */
     public void fireXAxisChange()
     {

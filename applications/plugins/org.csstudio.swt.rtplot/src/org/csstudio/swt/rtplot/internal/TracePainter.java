@@ -7,6 +7,10 @@
  ******************************************************************************/
 package org.csstudio.swt.rtplot.internal;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.locks.Lock;
+
 import org.csstudio.swt.rtplot.Axis;
 import org.csstudio.swt.rtplot.PointType;
 import org.csstudio.swt.rtplot.SWTMediaPool;
@@ -14,6 +18,7 @@ import org.csstudio.swt.rtplot.Trace;
 import org.csstudio.swt.rtplot.TraceType;
 import org.csstudio.swt.rtplot.data.PlotDataItem;
 import org.csstudio.swt.rtplot.data.PlotDataProvider;
+import org.csstudio.swt.rtplot.data.PlotDataSearch;
 import org.csstudio.swt.rtplot.internal.util.IntList;
 import org.csstudio.swt.rtplot.internal.util.ScreenTransform;
 import org.eclipse.swt.SWT;
@@ -24,7 +29,7 @@ import org.eclipse.swt.graphics.Rectangle;
 /** Helper for painting a {@link Trace}
  *  @param <XTYPE> Data type of horizontal {@link Axis}
  *  @author Kay Kasemir
- *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (added marker support) 
+ *  @author <a href="mailto:miha.novak@cosylab.com">Miha Novak</a> (reduced data support) 
  */
 public class TracePainter<XTYPE extends Comparable<XTYPE>>
 {
@@ -36,6 +41,8 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
 
     /** Initial {@link IntList} size */
     private static final int INITIAL_ARRAY_SIZE = 2048;
+    /** Minimum distance between two points (px) */
+    private static final int REDUCTION_DISTANCE = 2;   
 
     /** Fudge to avoid clip errors
      *
@@ -73,13 +80,15 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  @param x_transform Coordinate transform used by the x axis
      *  @param trace Trace, has reference to its value axis
      */
-    public void paint(final GC gc, final SWTMediaPool media, final Rectangle bounds, final ScreenTransform<XTYPE> x_transform, final YAxisImpl<XTYPE> y_axis, final Trace<XTYPE> trace, final PlotDataProvider<XTYPE> data)
+    public void paint(final GC gc, final SWTMediaPool media, final Rectangle bounds, final AxisPart<XTYPE> x_axis, final YAxisImpl<XTYPE> y_axis, final Trace<XTYPE> trace, final PlotDataProvider<XTYPE> data)
     {
         x_min = bounds.x - OUTSIDE;
         x_max = bounds.x + bounds.width + OUTSIDE;
         y_min = bounds.y - OUTSIDE;
         y_max = bounds.y + bounds.height + OUTSIDE;
-
+        
+        final ScreenTransform<XTYPE> x_transform = x_axis.getScreenTransform();
+        
         final Color old_color = gc.getForeground();
         final Color old_bg = gc.getBackground();
         final int old_width = gc.getLineWidth();
@@ -101,8 +110,8 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
         //
         // For now, main point is that this happens in non-UI thread,
         // so the slower the better to test UI responsiveness.
-//        final PlotDataProvider<XTYPE> data = trace.getData();
         data.getLock().lock();
+        PlotDataProvider<XTYPE> reducedData = data.size() > 0 ? getReducedDataProvider(data, x_axis, y_axis) : data;
         try
         {
             final TraceType type = trace.getType();
@@ -112,37 +121,37 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
                 break;
             case AREA:
                 gc.setAlpha(50);
-            	drawMinMaxArea(gc, x_transform, y_axis, data);
+            	drawMinMaxArea(gc, x_transform, y_axis, reducedData);
                 gc.setAlpha(255);
-                drawStdDevLines(gc, x_transform, y_axis, data, trace.getWidth());
-                drawValueStaircase(gc, x_transform, y_axis, data, trace.getWidth());
+                drawStdDevLines(gc, x_transform, y_axis, reducedData, trace.getWidth());
+                drawValueStaircase(gc, x_transform, y_axis, reducedData, trace.getWidth());
                 break;
             case AREA_DIRECT:
                 gc.setAlpha(50);
-                drawMinMaxArea(gc, x_transform, y_axis, data);
+                drawMinMaxArea(gc, x_transform, y_axis, reducedData);
                 gc.setAlpha(255);
-                drawStdDevLines(gc, x_transform, y_axis, data, trace.getWidth());
-                drawValueLines(gc, x_transform, y_axis, data, trace.getWidth());
+                drawStdDevLines(gc, x_transform, y_axis, reducedData, trace.getWidth());
+                drawValueLines(gc, x_transform, y_axis, reducedData, trace.getWidth());
                 break;
             case LINES:
-                drawMinMaxLines(gc, x_transform, y_axis, data, trace.getWidth());
+                drawMinMaxLines(gc, x_transform, y_axis, reducedData, trace.getWidth());
                 gc.setAlpha(50);
-                drawStdDevLines(gc, x_transform, y_axis, data, trace.getWidth());
+                drawStdDevLines(gc, x_transform, y_axis, reducedData, trace.getWidth());
                 gc.setAlpha(255);
-                drawValueStaircase(gc, x_transform, y_axis, data, trace.getWidth());
+                drawValueStaircase(gc, x_transform, y_axis, reducedData, trace.getWidth());
                 break;
             case LINES_DIRECT:
-                drawMinMaxLines(gc, x_transform, y_axis, data, trace.getWidth());
+                drawMinMaxLines(gc, x_transform, y_axis, reducedData, trace.getWidth());
                 gc.setAlpha(50);
-                drawStdDevLines(gc, x_transform, y_axis, data, trace.getWidth());
+                drawStdDevLines(gc, x_transform, y_axis, reducedData, trace.getWidth());
                 gc.setAlpha(255);
-                drawValueLines(gc, x_transform, y_axis, data, trace.getWidth());
+                drawValueLines(gc, x_transform, y_axis, reducedData, trace.getWidth());
                 break;
             case SINGLE_LINE:
-                drawValueStaircase(gc, x_transform, y_axis, data, trace.getWidth());
+                drawValueStaircase(gc, x_transform, y_axis, reducedData, trace.getWidth());
                 break;
             case SINGLE_LINE_DIRECT:
-                drawValueLines(gc, x_transform, y_axis, data, trace.getWidth());
+                drawValueLines(gc, x_transform, y_axis, reducedData, trace.getWidth());
                 break;
             }
 
@@ -156,7 +165,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
             case DIAMONDS:
             case XMARKS:
             case TRIANGLES:
-                drawPoints(gc, x_transform, y_axis, data, point_type, trace.getPointSize());
+                drawPoints(gc, x_transform, y_axis, reducedData, point_type, trace.getPointSize());
                 break;
             }
         }
@@ -501,4 +510,97 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
 	    min.clear();
 	    max.clear();
 	}
+
+    /**
+     * Reduce data provider data.
+     * 
+     * @param data data provider
+     * @param x_transform x transform
+     * @param y_axis y axis
+     * 
+     * @return reduced data list.
+     */
+    private List<PlotDataItem<XTYPE>> reduction(final PlotDataProvider<XTYPE> data, final AxisPart<XTYPE> x_axis,
+            final YAxisImpl<XTYPE> y_axis)
+    {
+        final ScreenTransform<XTYPE> x_transform = x_axis.getScreenTransform();
+        List<PlotDataItem<XTYPE>> reducedList = new ArrayList<PlotDataItem<XTYPE>>();
+
+        // find first and last visible item
+        PlotDataSearch<XTYPE> search = new PlotDataSearch<XTYPE>();
+        int startIndex = search.findSampleGreaterOrEqual(data, x_axis.range.getLow());
+        int endIndex = search.findSampleLessOrEqual(data, x_axis.range.getHigh());
+
+        startIndex = startIndex != -1 ? startIndex : 0;
+        endIndex = endIndex != -1 ? endIndex : data.size();
+
+        // find first item which value is not NaN
+        int x0 = -1;
+        double val0 = Double.NaN;
+        do {
+            PlotDataItem<XTYPE> item = data.get(startIndex);
+            reducedList.add(item);
+            x0 = (int) x_transform.transform(item.getPosition());
+            val0 = item.getValue();
+            startIndex++;
+        } while (Double.isNaN(val0) && startIndex != endIndex);
+        int y0 = (int) y_axis.getScreenCoord(val0);
+
+        // reduce data
+        for (int i = startIndex; i < endIndex + 1; i++) 
+        {
+            PlotDataItem<XTYPE> item = data.get(i);
+            int x1 = (int) x_transform.transform(item.getPosition());
+            double val1 = item.getValue();
+            if (Double.isNaN(val1))
+                reducedList.add(item);
+            else 
+            {
+                int y1 = (int) y_axis.getScreenCoord(val1);
+                if ((x0 - x1 > REDUCTION_DISTANCE || x1 - x0 > REDUCTION_DISTANCE)
+                        && (y0 - y1 > REDUCTION_DISTANCE || y1 - y0 > REDUCTION_DISTANCE)) 
+                {
+                    reducedList.add(item);
+                    x0 = x1;
+                    y0 = y1;
+                }
+            }
+        }
+        return reducedList;
+    }
+	
+	/**
+	 * Returns reduced data provider.
+	 * 
+	 * @param data data provider
+	 * @param x_transform x transform
+	 * @param y_axis y axis
+	 * 
+	 * @return reduced data provider.
+	 */
+    private PlotDataProvider<XTYPE> getReducedDataProvider(final PlotDataProvider<XTYPE> data,
+            final AxisPart<XTYPE> x_axis, final YAxisImpl<XTYPE> y_axis)
+    {
+        List<PlotDataItem<XTYPE>> reducedDataList = reduction(data, x_axis, y_axis);
+        return new PlotDataProvider<XTYPE>()
+            {
+                @Override
+                public Lock getLock() 
+                {
+                    return data.getLock();
+                }
+    
+                @Override
+                public int size() 
+                {
+                    return reducedDataList.size();
+                }
+    
+                @Override
+                public PlotDataItem<XTYPE> get(int index)
+                {
+                    return reducedDataList.get(index);
+                }
+            };
+    }
 }

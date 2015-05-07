@@ -9,11 +9,13 @@ package org.csstudio.trends.databrowser2.editor;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.logging.Level;
 
 import org.csstudio.apputil.ui.workbench.OpenViewAction;
 import org.csstudio.email.EMailSender;
+import org.csstudio.swt.rtplot.Marker;
 import org.csstudio.swt.rtplot.undo.UndoableActionManager;
 import org.csstudio.trends.databrowser2.Activator;
 import org.csstudio.trends.databrowser2.Messages;
@@ -53,12 +55,22 @@ import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.osgi.util.NLS;
-import org.eclipse.swt.layout.FillLayout;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.events.ControlEvent;
+import org.eclipse.swt.events.ControlListener;
+import org.eclipse.swt.events.MouseAdapter;
+import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Slider;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.IEditorSite;
@@ -102,7 +114,14 @@ public class DataBrowserEditor extends EditorPart
 
     /** @see #isDirty() */
     private boolean is_dirty = false;
+    
+    /** Slider for selecting samples */
+    private Slider sampleIndexSlider;
+        
+    private WaveformSnapshotViewer waveformSnapshotViewer;
 
+    private Composite waveformSnapshotComposite;
+        
     /** Create data browser editor
      *  @param input Input for editor, must be data browser config file
      *  @return DataBrowserEditor or <code>null</code> on error
@@ -286,10 +305,54 @@ public class DataBrowserEditor extends EditorPart
     @Override
     public void createPartControl(final Composite parent)
     {
-        // Create GUI elements (Plot)
-        parent.setLayout(new FillLayout());
-        plot = new ModelBasedPlot(parent);
+        // Create GUI elements
+        parent.setLayout(new GridLayout());
+        
+        SashForm sashForm = new SashForm(parent, SWT.VERTICAL);
+        sashForm.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        
+        plot = new ModelBasedPlot(sashForm);
+        plot.getPlot().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        onDoubleClickCreateMarker(plot);
+        
+        waveformSnapshotComposite = new Composite(sashForm, SWT.NONE);
+        waveformSnapshotComposite.setLayout(new GridLayout(1, true));
+        waveformSnapshotComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        waveformSnapshotComposite.setVisible(false);
 
+        sampleIndexSlider = new Slider(waveformSnapshotComposite, SWT.HORIZONTAL);
+        sampleIndexSlider.setToolTipText(Messages.WaveformTimeSelector);
+        sampleIndexSlider.setLayoutData(new GridData(SWT.FILL, SWT.DEFAULT, false, false, 1, 1));
+        sampleIndexSlider.addSelectionListener(new SelectionAdapter() 
+        {
+            @Override
+            public void widgetSelected(SelectionEvent e) 
+            {
+                if (!plot.getPlot().getMarkers().isEmpty())
+                {
+                    Instant x = plot.getPlot().getXAxis().getValue(sampleIndexSlider.getSelection());
+                    plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), x);
+                    waveformSnapshotViewer.retrieveSample(x);
+                }
+            }
+        });
+        
+        waveformSnapshotViewer = new WaveformSnapshotViewer(waveformSnapshotComposite,plot.getPlot());  
+        
+        plot.getPlot().getPlotControl().addControlListener(new ControlListener() 
+        {
+            @Override
+            public void controlResized(ControlEvent e)
+            {
+                setSliderRange();
+            }
+            
+            @Override
+            public void controlMoved(ControlEvent e)
+            {
+            }
+        });
+        
         // Create and start controller
         controller = new Controller(parent.getShell(), model, plot);
         try
@@ -424,6 +487,11 @@ public class DataBrowserEditor extends EditorPart
             if (SendToElogAction.isElogAvailable())
                 manager.add(new SendToElogAction(shell, plot.getPlot()));
         }
+
+        manager.add(new Separator());
+        manager.add(new RemoveMarkersAction(plot));
+        manager.add(new ShowWaveformSnapshotAction(plot.getPlot(), waveformSnapshotComposite));
+
     }
 
     /** {@inheritDoc} */
@@ -549,5 +617,48 @@ public class DataBrowserEditor extends EditorPart
             monitor.done();
         }
         setDirty(false);
+    }
+
+    
+    /**
+     * Adds mouse listener to the model based plot. On double click creates
+     * marker on the plot.
+     * 
+     * @param plot model based plot
+     */
+    private void onDoubleClickCreateMarker(ModelBasedPlot plot) {
+        plot.getPlot().getPlotControl().addMouseListener(new MouseAdapter() 
+        {
+        	@Override
+            public void mouseDoubleClick(MouseEvent e) 
+        	{
+                if (waveformSnapshotComposite.isVisible() && model.getItems().iterator().hasNext()) 
+                {
+                    Instant position = plot.getPlot().getXAxis().getValue(e.x);
+                    Marker<Instant> marker = new Marker<Instant>(position);
+                    if (plot.getPlot().getMarkers().isEmpty()) 
+                        plot.getPlot().addMarker(marker);
+                    else 
+                        plot.getPlot().updateMarker(plot.getPlot().getMarkers().get(0), position);
+                    waveformSnapshotViewer.retrieveSample(position);
+                    setSliderRange();
+                    sampleIndexSlider.setSelection(plot.getPlot().getXAxis().getScreenCoord(position));
+                }
+            }
+        });
+    }
+          
+    /**
+     * Sets slider range.
+     */
+    private void setSliderRange() 
+    {
+        Instant min = plot.getPlot().getXAxis().getValueRange().getLow();
+        Instant max = plot.getPlot().getXAxis().getValueRange().getHigh();
+        int x1 = plot.getPlot().getXAxis().getScreenCoord(min);
+        int x2 = plot.getPlot().getXAxis().getScreenCoord(max);
+        sampleIndexSlider.setMinimum(x1);
+        sampleIndexSlider.setMaximum(x2);
+        sampleIndexSlider.setPageIncrement(1);
     }
 }
