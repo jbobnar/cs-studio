@@ -11,8 +11,8 @@
   <name>cs-studio logbook project</name>
   <description>plugins and features for logbook applications in cs-studio</description>
   <modules>
-  <module>logbook-plugins</module>
-  <module>logbook-features</module>
-  <module>logbook-repository</module>
+    <module>logbook-plugins</module>
+    <module>logbook-features</module>
+    <module>logbook-repository</module>
   </modules>
 </project>

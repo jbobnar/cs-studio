@@ -19,7 +19,7 @@ OAK RIDGE, TN, USA.
 use this
 software.
 THIS SOFTWARE IS PROVIDED UNDER THIS LICENSE ON AN &quot;../AS IS&quot;
-BASIS. 
+BASIS.
 WITHOUT WARRANTY OF ANY KIND, EXPRESSED OR IMPLIED, INCLUDING
 BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
 FOR PARTICULAR PURPOSE AND NON-INFRINGEMENT.
@@ -32,13 +32,6 @@ For details, see http://www.eclipse.org/legal/epl-v10.html
 
    <plugin
          id="org.csstudio.archive.reader.channelarchiver"
-         download-size="0"
-         install-size="0"
-         version="0.0.0"
-         unpack="false"/>
-
-   <plugin
-         id="org.csstudio.archive.reader.rdb"
          download-size="0"
          install-size="0"
          version="0.0.0"
@@ -74,13 +67,6 @@ For details, see http://www.eclipse.org/legal/epl-v10.html
 
    <plugin
          id="org.csstudio.swt.rtplot"
-         download-size="0"
-         install-size="0"
-         version="0.0.0"
-         unpack="false"/>
-
-   <plugin
-         id="org.csstudio.archive.rdb"
          download-size="0"
          install-size="0"
          version="0.0.0"
