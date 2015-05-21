@@ -86,9 +86,9 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
         x_max = bounds.x + bounds.width + OUTSIDE;
         y_min = bounds.y - OUTSIDE;
         y_max = bounds.y + bounds.height + OUTSIDE;
-        
+
         final ScreenTransform<XTYPE> x_transform = x_axis.getScreenTransform();
-        
+
         final Color old_color = gc.getForeground();
         final Color old_bg = gc.getBackground();
         final int old_width = gc.getLineWidth();
@@ -121,7 +121,7 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
                 break;
             case AREA:
                 gc.setAlpha(50);
-            	drawMinMaxArea(gc, x_transform, y_axis, reducedData);
+                drawMinMaxArea(gc, x_transform, y_axis, reducedData);
                 gc.setAlpha(255);
                 drawStdDevLines(gc, x_transform, y_axis, reducedData, trace.getWidth());
                 drawValueStaircase(gc, x_transform, y_axis, reducedData, trace.getWidth());
@@ -454,62 +454,62 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
      *  @param min Minimum 'y' values in screen coords
      *  @param max .. maximum
      */
-	@SuppressWarnings("unused")
-	final private void flushPolyFill(final GC gc, final IntList pos, final IntList min, final IntList max)
+    @SuppressWarnings("unused")
+    final private void flushPolyFill(final GC gc, final IntList pos, final IntList min, final IntList max)
     {
-	    final int N = pos.size();
-	    if (N <= 0)
-	        return;
+        final int N = pos.size();
+        if (N <= 0)
+            return;
 
-	    if (true)
-	    {
-		    // 'direct' outline, point-to-point
-		    // Turn pos/min/max into array required by fillPolygon:
-		    // pos[0], min[0], pos[1], min[1], ..., pos[N-1], max[N-1], pos[N], max[N]
-		    final int N4 = N * 4;
-		    final int points[] = new int[N4];
-		    int head = 0, tail = N4;
-		    for (int i=0; i<N; ++i)
-		    {
-		        points[head++] = pos.get(i);
-		        points[head++] = min.get(i);
-		        points[--tail] = max.get(i);
-		        points[--tail] = pos.get(i);
-		    }
-		    gc.fillPolygon(points);
-	    }
-	    else
-	    {
-		    // 'staircase' outline
-		    final int points[] = new int[8*N-4];
+        if (true)
+        {
+            // 'direct' outline, point-to-point
+            // Turn pos/min/max into array required by fillPolygon:
+            // pos[0], min[0], pos[1], min[1], ..., pos[N-1], max[N-1], pos[N], max[N]
+            final int N4 = N * 4;
+            final int points[] = new int[N4];
+            int head = 0, tail = N4;
+            for (int i=0; i<N; ++i)
+            {
+                points[head++] = pos.get(i);
+                points[head++] = min.get(i);
+                points[--tail] = max.get(i);
+                points[--tail] = pos.get(i);
+            }
+            gc.fillPolygon(points);
+        }
+        else
+        {
+            // 'staircase' outline
+            final int points[] = new int[8*N-4];
 
-		    int p = 0;
-	        points[p++] = pos.get(0);
-	        int ly = points[p++] = min.get(0);
-		    for (int i=1; i<N; ++i)
-		    {
-		        points[p++] = pos.get(i);
-		        points[p++] = ly;
-		        points[p++] = pos.get(i);
-		        ly = points[p++] = min.get(i);
-		    }
+            int p = 0;
+            points[p++] = pos.get(0);
+            int ly = points[p++] = min.get(0);
+            for (int i=1; i<N; ++i)
+            {
+                points[p++] = pos.get(i);
+                points[p++] = ly;
+                points[p++] = pos.get(i);
+                ly = points[p++] = min.get(i);
+            }
 
-		    int lx = points[p++] = pos.get(N-1);
-		    points[p++] = max.get(N-1);
-		    for (int i=N-2; i>=0; --i)
-		    {
-			    points[p++] = lx;
-			    points[p++] = max.get(i);
-			    lx = points[p++] = pos.get(i);
-			    points[p++] = max.get(i);
-		    }
-		    gc.fillPolygon(points);
-	    }
+            int lx = points[p++] = pos.get(N-1);
+            points[p++] = max.get(N-1);
+            for (int i=N-2; i>=0; --i)
+            {
+                points[p++] = lx;
+                points[p++] = max.get(i);
+                lx = points[p++] = pos.get(i);
+                points[p++] = max.get(i);
+            }
+            gc.fillPolygon(points);
+        }
 
-	    pos.clear();
-	    min.clear();
-	    max.clear();
-	}
+        pos.clear();
+        min.clear();
+        max.clear();
+    }
 
     /**
      * Reduce data provider data.
@@ -568,16 +568,16 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
         }
         return reducedList;
     }
-	
-	/**
-	 * Returns reduced data provider.
-	 * 
-	 * @param data data provider
-	 * @param x_transform x transform
-	 * @param y_axis y axis
-	 * 
-	 * @return reduced data provider.
-	 */
+
+    /**
+     * Returns reduced data provider.
+     * 
+     * @param data data provider
+     * @param x_transform x transform
+     * @param y_axis y axis
+     * 
+     * @return reduced data provider.
+     */
     private PlotDataProvider<XTYPE> getReducedDataProvider(final PlotDataProvider<XTYPE> data,
             final AxisPart<XTYPE> x_axis, final YAxisImpl<XTYPE> y_axis)
     {
@@ -589,13 +589,13 @@ public class TracePainter<XTYPE extends Comparable<XTYPE>>
                 {
                     return data.getLock();
                 }
-    
+
                 @Override
                 public int size() 
                 {
                     return reducedDataList.size();
                 }
-    
+
                 @Override
                 public PlotDataItem<XTYPE> get(int index)
                 {
