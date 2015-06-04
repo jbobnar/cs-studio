@@ -74,7 +74,6 @@ import org.eclipse.swt.widgets.Slider;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.IEditorSite;
-import org.eclipse.ui.IPageLayout;
 import org.eclipse.ui.IPartListener2;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchActionConstants;
@@ -454,10 +453,7 @@ public class DataBrowserEditor extends EditorPart
         manager.add(new Separator());
 
         if (is_rcp  ||  ! Preferences.hidePropertiesView())
-            manager.add(new OpenViewAction(
-                        IPageLayout.ID_PROP_SHEET,
-                        Messages.OpenPropertiesView,
-                        activator.getImageDescriptor("icons/prop_ps.gif")));
+            manager.add(new OpenPropertiesAction());
         if (is_rcp  ||  ! Preferences.hideSearchView())
             manager.add(new OpenViewAction(SearchView.ID, Messages.OpenSearchView,
                     activator.getImageDescriptor("icons/search.gif")));
