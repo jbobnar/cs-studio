@@ -8,14 +8,19 @@
 package org.csstudio.opibuilder.script;
 
 import java.io.InputStream;
+import java.io.InputStreamReader;
 
 import org.csstudio.opibuilder.editparts.AbstractBaseEditPart;
 import org.csstudio.opibuilder.util.ResourceUtil;
 import org.csstudio.simplepv.IPV;
 import org.eclipse.core.runtime.IPath;
+import org.python.core.Py;
 import org.python.core.PyCode;
+import org.python.core.PyObject;
 import org.python.core.PyString;
+import org.python.core.PyStringMap;
 import org.python.core.PySystemState;
+import org.python.util.PythonInterpreter;
 
 /**
  * This is the implementation of {@link AbstractScriptStore} for Jython PythonInterpreter.
@@ -24,7 +29,8 @@ import org.python.core.PySystemState;
  */
 public class JythonScriptStore extends AbstractScriptStore{
 
-    private PythonInterpreter interpreter;
+    private PythonInterpreter interp;
+    private PySystemState state;
 
     private PyCode code;
 
@@ -38,7 +44,7 @@ public class JythonScriptStore extends AbstractScriptStore{
     protected void initScriptEngine() {
         IPath scriptPath = getAbsoluteScriptPath();
         //Add the path of script to python module search path
-        PySystemState state = new PySystemState();
+        state = Py.getSystemState();
         if(scriptPath != null && !scriptPath.isEmpty()){
 
             //If it is a workspace file.
@@ -51,30 +57,53 @@ public class JythonScriptStore extends AbstractScriptStore{
                 state.path.append(new PyString(folderPath.toOSString()));
             }
         }
-
-        interpreter = new PythonInterpreter(null, state);
+        interp = PythonInterpreter.threadLocalStateInterpreter(state.getDict());
     }
 
     @Override
     protected void compileString(String string) throws Exception {
-        code = interpreter.compile(string);
+        code = interp.compile(string);
     }
 
     @Override
     protected void compileInputStream(InputStream s) throws Exception {
-        code = interpreter.compile(s);
+        code = interp.compile(new InputStreamReader(s));
     }
 
     @Override
     protected void execScript(final IPV triggerPV) throws Exception {
-        interpreter.set(ScriptService.WIDGET, getEditPart());
-        interpreter.set(ScriptService.PVS, getPvArray());
-        interpreter.set(ScriptService.DISPLAY, getDisplayEditPart());
-        interpreter.set(ScriptService.WIDGET_CONTROLLER_DEPRECIATED, getEditPart());
-        interpreter.set(ScriptService.PV_ARRAY_DEPRECIATED, getPvArray());
-        interpreter.set(ScriptService.TRIGGER_PV, triggerPV);
-        interpreter.exec(code);
+	interp.set(ScriptService.WIDGET, getEditPart());
+	interp.set(ScriptService.PVS, getPvArray());
+	interp.set(ScriptService.DISPLAY, getDisplayEditPart());
+	interp.set(ScriptService.WIDGET_CONTROLLER_DEPRECIATED, getEditPart());
+	interp.set(ScriptService.PV_ARRAY_DEPRECIATED, getPvArray());
+	interp.set(ScriptService.TRIGGER_PV, triggerPV);
+	interp.exec(code);
     }
 
-
+    @Override
+    protected void dispose() {
+        if (interp != null) {
+            PyObject o = interp.getLocals();
+            if (o != null && o instanceof PyStringMap) {
+                ((PyStringMap)o).clear();
+            }
+//            o = state.getBuiltins();
+//            if (o != null && o instanceof PyStringMap) {
+//                ((PyStringMap)o).clear();
+//            }
+            o = state.getDict();
+            if (o != null && o instanceof PyStringMap) {
+                ((PyStringMap)o).clear();
+            }
+            state.close();
+            state.cleanup();
+            interp.close();
+            interp.cleanup();
+            interp = null;
+            state = null;
+        }
+        code = null;
+        super.dispose();
+    }
 }

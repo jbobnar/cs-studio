@@ -161,4 +161,11 @@ public abstract class AbstractWidgetAction implements IAdaptable {
         return widgetModel;
     }
 
+    /**
+     * Dispose of all resources allocated by this action.
+     */
+    public void dispose() {
+
+    }
+
 }

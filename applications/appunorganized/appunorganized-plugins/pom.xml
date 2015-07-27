@@ -16,7 +16,6 @@
     <module>org.csstudio.debugging.jmsmonitor</module>
     <module>org.csstudio.debugging.rdbshell</module>
     <module>org.csstudio.desy.logging.ui</module>
-    <module>org.csstudio.diag.pvfields.test</module>
     <module>org.csstudio.dummyauthorization</module>
     <module>org.csstudio.email</module>
     <module>org.csstudio.email.test</module>
@@ -49,7 +48,6 @@
     <module>org.csstudio.service.unitconversion</module>
     
     
-    <module>org.csstudio.simplepv.vtypepv</module>
     <module>org.csstudio.snl.intro</module>
     <module>org.csstudio.swt.chart</module>
     <module>org.csstudio.swt.rtplot</module>

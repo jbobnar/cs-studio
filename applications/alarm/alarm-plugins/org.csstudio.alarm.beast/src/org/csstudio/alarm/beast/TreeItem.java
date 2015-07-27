@@ -8,8 +8,9 @@
 package org.csstudio.alarm.beast;
 
 import java.io.PrintStream;
-import java.util.ArrayList;
+import java.io.Serializable;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /** Base for alarm tree items: Tree hierarchy, ID, name, path.
  *
@@ -19,21 +20,23 @@ import java.util.List;
  *  @author Kay Kasemir
  */
 @SuppressWarnings("nls")
-public class TreeItem
+public class TreeItem implements Serializable
 {
+    private static final long serialVersionUID = -1006218834678042080L;
+
     /** RDB ID
      *  @see #setID(int)
      */
-    private int id;
+    private volatile int id;
 
     /** Visible name of the item */
     final private String name;
 
     /** Parent node */
-    private TreeItem parent;
+    private volatile transient TreeItem parent;
 
     /** Sub-tree elements of this item */
-    final private List<TreeItem> children = new ArrayList<TreeItem>();
+    final private List<TreeItem> children = new CopyOnWriteArrayList<>();
 
     // According to JProfiler, equals()/getPathName()/hashCode()
     // are called A LOT whenever the JFace tree view is updated or
@@ -71,7 +74,7 @@ public class TreeItem
     }
 
     /** @return Parent item. <code>null</code> for root */
-    synchronized public TreeItem getParent()
+    public TreeItem getParent()
     {
         return parent;
     }
@@ -90,7 +93,7 @@ public class TreeItem
     }
 
     /** @return RDB ID */
-    final public synchronized int getID()
+    final public int getID()
     {
         return id;
     }
@@ -122,7 +125,7 @@ public class TreeItem
     }
 
     /** @return Number of child nodes */
-    final public synchronized int getChildCount()
+    final public int getChildCount()
     {
         return children.size();
     }
@@ -132,7 +135,7 @@ public class TreeItem
      *  @throws IndexOutOfBoundsException if the index is out of range
      *          (<tt>index &lt; 0 || index &gt;= getChildCount()</tt>)
      */
-    public synchronized TreeItem getChild(final int index)
+    public TreeItem getChild(final int index)
     {
         return children.get(index);
     }
@@ -141,7 +144,7 @@ public class TreeItem
      *  @param child_name Name of child to locate.
      *  @return Child with given name or <code>null</code> if not found.
      */
-    public synchronized TreeItem getChild(final String name)
+    public TreeItem getChild(final String name)
     {
         for (TreeItem child : children)
             if (child.getName().equals(name))
@@ -153,7 +156,7 @@ public class TreeItem
      *  'private' because child items add themself in constructor.
      *  @param child New child item
      */
-    final synchronized private void addChild(final TreeItem child)
+    final private void addChild(final TreeItem child)
     {
         children.add(child);
     }
@@ -181,7 +184,7 @@ public class TreeItem
      *  @param child
      *  @throws Error if child not known
      */
-    private synchronized void removeChild(final TreeItem child)
+    private void removeChild(final TreeItem child)
     {
         if (! children.remove(child))
             throw new Error("Corrupted tree item: " + toString());
@@ -191,7 +194,7 @@ public class TreeItem
      *  @param path Path to item
      *  @return Item or <code>null</code> if not found
      */
-    public synchronized TreeItem getItemByPath(final String path)
+    public TreeItem getItemByPath(final String path)
     {
         if (path == null)
             return null;
@@ -215,7 +218,7 @@ public class TreeItem
      *  Derived classes should override <code>dump_item()</code>
      *  @param out PrintStream
      */
-    final synchronized public void dump(final PrintStream out)
+    final public void dump(final PrintStream out)
     {
         dump(out, "");
     }
@@ -246,7 +249,7 @@ public class TreeItem
     /** Perform hierarchy consistency check
      *  @throws Exception on error
      */
-    final synchronized public void check() throws Exception
+    final public void check() throws Exception
     {
         // All subtree entries must point back to this as their parent
         for (TreeItem child : children)

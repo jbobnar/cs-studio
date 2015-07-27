@@ -7,8 +7,10 @@
  ******************************************************************************/
 package org.csstudio.alarm.beast.ui.clientmodel;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -64,8 +66,9 @@ import org.eclipse.osgi.util.NLS;
 @SuppressWarnings("nls")
 public class AlarmClientModel
 {
-    /** Singleton instance */
-    private static AlarmClientModel instance = null;
+    private static AlarmClientModel default_instance;
+    // shared instances
+    private static final Set<AlarmClientModel> INSTANCES = Collections.newSetFromMap(new WeakHashMap<>());
 
     /** Reference count for instance */
     private AtomicInteger references = new AtomicInteger();
@@ -125,10 +128,14 @@ public class AlarmClientModel
     /** @return <code>true</code> for read-only model */
     final private boolean allow_write = ! Preferences.isReadOnly();
 
+    /** Indicates if the model accepts or denies a change of the configuration name */
+    final private boolean allow_config_changes;
+
     /** Initialize client model */
-    private AlarmClientModel(final String config_name) throws Exception
+    private AlarmClientModel(final String config_name, boolean allow_config_changes) throws Exception
     {
         this.config_name = config_name;
+        this.allow_config_changes = allow_config_changes;
         // Initial dummy alarm info
         createPseudoAlarmTree(Messages.AlarmClientModel_NotInitialized);
 
@@ -147,16 +154,26 @@ public class AlarmClientModel
     {
         if(config_name == null)
             throw new Exception("Configuration name can't be null");
-        synchronized (AlarmClientModel.class)
+        AlarmClientModel instance = null;
+        synchronized (INSTANCES)
         {
-            if (instance == null)
-                instance = new AlarmClientModel(config_name);
+            for (AlarmClientModel model : INSTANCES) {
+                if (config_name.equals(model.getConfigurationName())) {
+                    instance = model;
+                }
+            }
+            if (instance == null) {
+                instance = new AlarmClientModel(config_name,false);
+                INSTANCES.add(instance);
+            }
         }
         instance.references.incrementAndGet();
         return instance;
     }
 
-    /** Obtain the shared instance.
+    /**
+     * Obtain the shared instance for the default alarm tree root. This instance allows
+     * changing the configuration name after the model was created.
      *  <p>
      *  Increments the reference count.
      *  @see #release()
@@ -165,16 +182,13 @@ public class AlarmClientModel
      */
     public static AlarmClientModel getInstance() throws Exception
     {
-        return getInstance(Preferences.getAlarmTreeRoot());
-    }
-
-    /** Release the 'instance' */
-    private static void releaseInstance()
-    {
-        synchronized (AlarmClientModel.class)
-        {
-            instance = null;
+        synchronized(INSTANCES) {
+            if (default_instance == null) {
+                default_instance = new AlarmClientModel(Preferences.getAlarmTreeRoot(),true);
+            }
         }
+        default_instance.references.incrementAndGet();
+        return default_instance;
     }
 
     /** Must be called to release model when no longer used.
@@ -186,9 +200,23 @@ public class AlarmClientModel
     {
         if (references.decrementAndGet() > 0)
             return;
+        internalRelease();
+        synchronized(INSTANCES) {
+            if (this == default_instance) {
+                default_instance = null;
+            }
+        }
+    }
+
+    private void internalRelease()
+    {
         try
         {
             Activator.getLogger().fine("AlarmClientModel closed.");
+            synchronized(INSTANCES)
+            {
+                INSTANCES.remove(this);
+            }
             // Don't lock the model while closing the communicator
             // because communicator could right now be in a model
             // update which in turn already locks the model -> deadlock
@@ -213,7 +241,13 @@ public class AlarmClientModel
         {
             Activator.getLogger().log(Level.WARNING, "Model release failed", ex);
         }
-        releaseInstance();
+    }
+
+    @Override
+    protected void finalize() throws Throwable
+    {
+        internalRelease();
+        super.finalize();
     }
 
     /** List all configuration 'root' element names, i.e. names
@@ -243,6 +277,9 @@ public class AlarmClientModel
     public boolean setConfigurationName(final String new_root_name,
             final AlarmClientModelConfigListener listener)
     {
+        if (!allow_config_changes) {
+            throw new UnsupportedOperationException("Configuration name of this model cannot be changed.");
+        }
         // TODO If loading, ignore change
         synchronized (this)
         {
@@ -881,12 +918,11 @@ public class AlarmClientModel
             {
                 config.closeStatements();
             }
+            // This could change the alarm tree after a PV was disabled or enabled.
+            final AlarmTreeItem parent = pv.getParent();
+            if (parent != null)
+                parent.maximizeSeverity();
         }
-
-        // This could change the alarm tree after a PV was disabled or enabled.
-        final AlarmTreeItem parent = pv.getParent();
-        if (parent != null)
-            parent.maximizeSeverity();
 
         // Note that this may actually be a new PV that this instance
         // of the client GUI has just added.
@@ -911,6 +947,8 @@ public class AlarmClientModel
     public void updateEnablement(final String name, final boolean enabled)
     {
         final AlarmTreePV pv;
+        // Lock model because complete tree is searched for PV,
+        // then severity maximized up to root.
         synchronized (this)
         {
             pv = findPV(name);
@@ -922,11 +960,11 @@ public class AlarmClientModel
                 return;
             }
             pv.setEnabled(enabled);
+            // This could change the alarm tree after a PV was disabled or enabled.
+            final AlarmTreeItem parent = pv.getParent();
+            if (parent != null)
+                parent.maximizeSeverity();
         }
-        // This could change the alarm tree after a PV was disabled or enabled.
-        final AlarmTreeItem parent = pv.getParent();
-        if (parent != null)
-            parent.maximizeSeverity();
         // Update alarm display
         fireNewAlarmState(pv, true);
     }

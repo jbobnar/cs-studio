@@ -28,9 +28,10 @@ import org.eclipse.osgi.util.NLS;
  */
 public class AlarmTableContentProvider implements ILazyContentProvider
 {
-    final private int alarm_table_row_limit = Preferences.getAlarmTableRowLimit();
+    private int alarm_table_row_limit = Preferences.getAlarmTableRowLimit();
     private TableViewer table_viewer;
     private AlarmTreePV[] alarms;
+    private AlarmTreePV[] orgAlarms;
     private Comparator<AlarmTreePV> comparator = AlarmComparator.getComparator(ColumnInfo.SEVERITY, false);
 
     /** Update the list of alarms to display.
@@ -38,13 +39,15 @@ public class AlarmTableContentProvider implements ILazyContentProvider
      */
     public void setAlarms(final AlarmTreePV alarms[])
     {
+        this.orgAlarms = alarms;
         if (alarms == null)
         {
             this.alarms = null;
             table_viewer.setItemCount(0);
         }
         else if (alarms.length > alarm_table_row_limit)
-        {    // Use only a subset of actual alarms
+        { // Use only a subset of actual alarms
+            Arrays.sort(alarms, comparator);
             this.alarms = new AlarmTreePV[alarm_table_row_limit + 1];
             System.arraycopy(alarms, 0, this.alarms, 0, alarm_table_row_limit);
             // Add explanatory entry to end
@@ -52,7 +55,6 @@ public class AlarmTableContentProvider implements ILazyContentProvider
             info.setDescription(NLS.bind(Messages.AlarmTableRowLimitInfoFmt, alarm_table_row_limit));
             this.alarms[alarm_table_row_limit] = info;
             // Sort all but that explanatory entry
-            Arrays.sort(this.alarms, 0, alarm_table_row_limit, comparator);
             table_viewer.setItemCount(alarm_table_row_limit + 1);
         }
         else
@@ -62,6 +64,18 @@ public class AlarmTableContentProvider implements ILazyContentProvider
             table_viewer.setItemCount(alarms.length);
         }
         table_viewer.refresh();
+    }
+
+    /**
+     * Set the limit for the number of alarms shown in the table.
+     *
+     * @see #setAlarms(AlarmTreePV[])
+     * @param limit the maximum number of alarms visible in the table
+     */
+    public void setNumberOfAlarmsLimit(int limit) {
+        this.alarm_table_row_limit = limit;
+        if (table_viewer != null)
+            setAlarms(orgAlarms);
     }
 
     /** @return Alarms to be shown in table */
@@ -76,7 +90,7 @@ public class AlarmTableContentProvider implements ILazyContentProvider
         this.comparator = comparator;
         // trigger refresh
         if (table_viewer != null)
-            setAlarms(alarms);
+            setAlarms(orgAlarms);
     }
 
     /** {@inheritDoc} */
@@ -100,4 +114,4 @@ public class AlarmTableContentProvider implements ILazyContentProvider
     {
         // Nothing to dispose
     }
- }
+}

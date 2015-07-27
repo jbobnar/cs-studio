@@ -14,18 +14,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.csstudio.opibuilder.editparts.AbstractBaseEditPart;
 import org.csstudio.opibuilder.editparts.AbstractLayoutEditpart;
 import org.csstudio.opibuilder.editparts.AbstractLinkingContainerEditpart;
 import org.csstudio.opibuilder.editparts.ExecutionMode;
 import org.csstudio.opibuilder.model.AbstractContainerModel;
-import org.csstudio.opibuilder.model.AbstractLinkingContainerModel;
 import org.csstudio.opibuilder.model.AbstractWidgetModel;
 import org.csstudio.opibuilder.model.ConnectionModel;
 import org.csstudio.opibuilder.model.DisplayModel;
 import org.csstudio.opibuilder.persistence.XMLUtil;
-import org.csstudio.opibuilder.properties.AbstractWidgetProperty;
 import org.csstudio.opibuilder.properties.IWidgetPropertyChangeHandler;
 import org.csstudio.opibuilder.util.ConsoleService;
 import org.csstudio.opibuilder.util.GeometryUtil;
@@ -55,6 +54,7 @@ import org.eclipse.ui.IActionFilter;
 public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
 
     private static AtomicInteger linkingContainerID = new AtomicInteger();
+    private static Logger log = Logger.getLogger(LinkingContainerEditpart.class.getName());
 
     private List<ConnectionModel> connectionList;
     private Map<ConnectionModel, PointList> originalPoints;
@@ -100,6 +100,8 @@ public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
     @Override
     protected void registerPropertyChangeHandlers() {
         IWidgetPropertyChangeHandler handler = new IWidgetPropertyChangeHandler(){
+
+            @Override
             public boolean handleChange(Object oldValue, Object newValue,
                     IFigure figure) {
                 if(newValue != null && newValue instanceof IPath){
@@ -108,9 +110,16 @@ public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
                     if(!absolutePath.isAbsolute())
                         absolutePath = ResourceUtil.buildAbsolutePath(
                                 getWidgetModel(), absolutePath);
-                    DisplayModel displayModel = new DisplayModel(widgetModel.getDisplayModel().getOpiFilePath());
-                    widgetModel.setDisplayModel(displayModel);
-                    loadWidgets(getWidgetModel(),true);
+                    if(oldValue != null && oldValue instanceof IPath){
+                        widgetModel.setDisplayModel(null);
+                    }else{
+                        DisplayModel displayModel = new DisplayModel(absolutePath);
+                        if (widgetModel.getMacroMap().equals(displayModel.getMacroMap())) {
+                            widgetModel.setDisplayModel(displayModel);
+                        } else {
+                            widgetModel.setDisplayModel(null);
+                        }
+                    }
                     configureDisplayModel();
                 }
                 return true;
@@ -121,8 +130,9 @@ public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
 
         //load from group
         handler = new IWidgetPropertyChangeHandler() {
+            @Override
             public boolean handleChange(Object oldValue, Object newValue, IFigure figure) {
-                loadWidgets(getWidgetModel(),true);
+                //loadWidgets(getWidgetModel(),true);
                 configureDisplayModel();
                 return false;
             }
@@ -131,6 +141,7 @@ public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
         setPropertyChangeHandler(LinkingContainerModel.PROP_GROUP_NAME, handler);
 
         handler = new IWidgetPropertyChangeHandler() {
+            @Override
             public boolean handleChange(Object oldValue, Object newValue, IFigure figure) {
                 if((int)newValue == LinkingContainerModel.ResizeBehaviour.SIZE_OPI_TO_CONTAINER.ordinal()) {
                     ((LinkingContainerFigure)figure).setZoomToFitAll(true);
@@ -146,7 +157,7 @@ public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
             }
         };
         setPropertyChangeHandler(LinkingContainerModel.PROP_RESIZE_BEHAVIOUR, handler);
-        loadWidgets(getWidgetModel(),true);
+        //loadWidgets(getWidgetModel(),true);
         configureDisplayModel();
     }
 
@@ -157,10 +168,14 @@ public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
 
     /**
      * @param path the path of the OPI file
+     *
+     * Removing this call because the add remove children in fillLinkingContainer overlap
+     * with the add remove in configureDisplayModel, and cause pv connection issues.
+     * This reverts some of the work from #912
      */
     private synchronized void loadWidgets(LinkingContainerModel model, final boolean checkSelf) {
         try {
-            model.removeAllChildren();
+          //  model.removeAllChildren();
             XMLUtil.fillLinkingContainer(model);
         } catch (Exception e) {
             //log first
@@ -183,23 +198,37 @@ public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
      */
     private synchronized void configureDisplayModel() {
         //This need to be executed after GUI created.
-        if(getWidgetModel().getDisplayModel() == null)
-            getWidgetModel().setDisplayModel(new DisplayModel());
+        if(getWidgetModel().getDisplayModel() == null) {
+            IPath path = getWidgetModel().getOPIFilePath();
+            log.info(path.toString());
 
+            final DisplayModel tempDisplayModel = new DisplayModel(path);
+            getWidgetModel().setDisplayModel(tempDisplayModel);
+            try {
+                if (! path.isEmpty())
+                    XMLUtil.fillDisplayModelFromInputStream(
+                            ResourceUtil.pathToInputStream(path), tempDisplayModel,
+                            getViewer().getControl().getDisplay());
+            } catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
 
         LinkingContainerModel widgetModel = getWidgetModel();
         DisplayModel displayModel = widgetModel.getDisplayModel();
         widgetModel.setDisplayModelViewer((GraphicalViewer) getViewer());
-        widgetModel.setDisplayModelDisplayID(widgetModel.getRootDisplayModel().getDisplayID());
+        widgetModel.setDisplayModelDisplayID(widgetModel.getRootDisplayModel(false).getDisplayID());
 
         UIBundlingThread.getInstance().addRunnable(new Runnable() {
             @Override
             public void run() {
                 LinkingContainerModel widgetModel = getWidgetModel();
                 widgetModel.setDisplayModelExecutionMode(getExecutionMode());
-                widgetModel.setDisplayModelOpiRuntime(widgetModel.getRootDisplayModel().getOpiRuntime());
+                widgetModel.setDisplayModelOpiRuntime(widgetModel.getRootDisplayModel(false).getOpiRuntime());
             }
         });
+
 
         connectionList = displayModel.getConnectionList();
         if(connectionList !=null && !connectionList.isEmpty()){
@@ -234,8 +263,6 @@ public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
             ((LinkingContainerFigure)getFigure()).updateZoom();
         });
 
-        getWidgetModel().setDisplayModel(displayModel);
-
         //Add scripts on display model
         if (getExecutionMode() == ExecutionMode.RUN_MODE) {
             widgetModel
@@ -245,11 +272,17 @@ public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
                             .getScriptList());
         }
         // tempDisplayModel.removeAllChildren();
-        if (widgetModel.isAutoSize()) {
-            performAutosize();
-        }
         LinkedHashMap<String,String> map = new LinkedHashMap<>();
         AbstractContainerModel loadTarget = displayModel;
+
+        if(!widgetModel.getGroupName().trim().equals("")){ //$NON-NLS-1$
+            AbstractWidgetModel group =
+                displayModel.getChildByName(widgetModel.getGroupName());
+            if(group != null && group instanceof AbstractContainerModel){
+                loadTarget = (AbstractContainerModel) group;
+            }
+        }
+
         // Load "LCID" macro whose value is unique to this instance of Linking Container.
         if (widgetModel.getExecutionMode() == ExecutionMode.RUN_MODE) {
             map.put("LCID", "LCID_" + getLinkingContainerID());
@@ -257,7 +290,7 @@ public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
         //Load system macro
         if(displayModel.getMacrosInput().isInclude_parent_macros()){
             map.putAll(
-                    (LinkedHashMap<String, String>) displayModel.getParentMacroMap());
+                    displayModel.getParentMacroMap());
         }
         //Load macro from its macrosInput
         map.putAll(displayModel.getMacrosInput().getMacrosMap());
@@ -269,13 +302,17 @@ public class LinkingContainerEditpart extends AbstractLinkingContainerEditpart{
         widgetModel.setMacroMap(map);
 
         widgetModel.removeAllChildren();
-        for (AbstractWidgetModel w : loadTarget.getChildren()){
-            widgetModel.addChild(w, true);
-        }
+        widgetModel.addChildren(loadTarget.getChildren(), true);
         widgetModel.setDisplayModel(displayModel);
 
         DisplayModel parentDisplay = widgetModel.getRootDisplayModel();
         parentDisplay.syncConnections();
+        DisplayModel parentDisplay2 = widgetModel.getRootDisplayModel(false);
+        if (parentDisplay != parentDisplay2)
+            parentDisplay2.syncConnections();
+        if(getWidgetModel().isAutoSize()){
+            performAutosize();
+        }
     }
 
 

@@ -143,6 +143,8 @@ public class PVWidgetEditpartDelegate implements IPVWidgetEditpart {
     private boolean isAlarmPulsing = false;
     private ScheduledFuture<?> scheduledFuture;
 
+    private boolean pvsHaveBeenStarted = false;
+    
     /**
      * @param editpart the editpart to be delegated.
      * It must implemented {@link IPVWidgetEditpart}
@@ -191,6 +193,7 @@ public class PVWidgetEditpartDelegate implements IPVWidgetEditpart {
      * This should be called as the last step in editpart.activate().
      */
     public void startPVs() {
+        pvsHaveBeenStarted = true;
         //the pv should be started at the last minute
         for(String pvPropId : pvMap.keySet()){
             IPV pv = pvMap.get(pvPropId);
@@ -204,9 +207,11 @@ public class PVWidgetEditpartDelegate implements IPVWidgetEditpart {
     }
 
     public void doDeActivate() {
+        if (pvsHaveBeenStarted) {
             for(IPV pv : pvMap.values())
                 pv.stop();
-
+            pvsHaveBeenStarted = false;
+        }
             for(String pvPropID : pvListenerMap.keySet()){
                 pvMap.get(pvPropID).removeListener(pvListenerMap.get(pvPropID));
             }
@@ -724,27 +729,39 @@ public class PVWidgetEditpartDelegate implements IPVWidgetEditpart {
                 UIBundlingThread.getInstance().addRunnable(
                         editpart.getViewer().getControl().getDisplay(),new Runnable(){
                     public void run() {
-                        IFigure figure = editpart.getFigure();
-                        if(figure.getCursor() == Cursors.NO)
-                            figure.setCursor(savedCursor);
-                        figure.setEnabled(widgetModel.isEnabled());
-                        figure.repaint();
+                        setControlEnabled(true);
                     }
                 });
-            }else{
+            } else {
                 UIBundlingThread.getInstance().addRunnable(
                         editpart.getViewer().getControl().getDisplay(),new Runnable(){
                     public void run() {
-                        IFigure figure = editpart.getFigure();
-                        if(figure.getCursor() != Cursors.NO)
-                            savedCursor = figure.getCursor();
-                        figure.setEnabled(false);
-                        figure.setCursor(Cursors.NO);
-                        figure.repaint();
+                        setControlEnabled(false);
                     }
                 });
             }
+        }
+    }
 
+    /**
+     * Set whether the editpart is enabled for PV control.  Disabled 
+     * editparts have greyed-out figures, and the cursor is set to a cross.
+     */
+    @Override
+    public void setControlEnabled(boolean enabled) {
+        if (enabled) {
+            IFigure figure = editpart.getFigure();
+            if(figure.getCursor() == Cursors.NO)
+                figure.setCursor(savedCursor);
+            figure.setEnabled(editpart.getWidgetModel().isEnabled());
+            figure.repaint();
+        } else {
+            IFigure figure = editpart.getFigure();
+            if(figure.getCursor() != Cursors.NO)
+                savedCursor = figure.getCursor();
+            figure.setEnabled(false);
+            figure.setCursor(Cursors.NO);
+            figure.repaint();
         }
     }
 

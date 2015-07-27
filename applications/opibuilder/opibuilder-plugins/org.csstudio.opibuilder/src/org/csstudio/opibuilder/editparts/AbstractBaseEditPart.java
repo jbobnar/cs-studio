@@ -53,9 +53,9 @@ import org.csstudio.opibuilder.util.OPIFont;
 import org.csstudio.opibuilder.util.SingleSourceHelper;
 import org.csstudio.opibuilder.visualparts.BorderFactory;
 import org.csstudio.opibuilder.visualparts.TooltipLabel;
-import org.csstudio.opibuilder.widgetActions.AbstractOpenOPIAction;
 import org.csstudio.opibuilder.widgetActions.AbstractWidgetAction;
 import org.csstudio.opibuilder.widgetActions.ActionsInput;
+import org.csstudio.opibuilder.widgetActions.OpenDisplayAction;
 import org.csstudio.simplepv.IPV;
 import org.csstudio.ui.util.CustomMediaFactory;
 import org.csstudio.ui.util.thread.UIBundlingThread;
@@ -129,6 +129,8 @@ public abstract class AbstractBaseEditPart extends AbstractGraphicalEditPart imp
     private List<ScriptData> scriptDataList;
 
     protected Map<String, ConnectionAnchor> anchorMap;
+    
+    private boolean hasStartedPVs = false;
 
     public AbstractBaseEditPart() {
         propertyListenerMap = new HashMap<String, WidgetPropertyChangeListener>();
@@ -210,6 +212,11 @@ public abstract class AbstractBaseEditPart extends AbstractGraphicalEditPart imp
 
                     UIBundlingThread.getInstance().addRunnable(new Runnable() {
                         public void run() {
+                            if (!isActive()) {
+                                //already deactivated
+                                return;
+                            }
+                            hasStartedPVs = true;
                             for (IPV pv : pvArray)
                                 if (pv != null && !pv.isStarted())
                                     try {
@@ -290,6 +297,10 @@ public abstract class AbstractBaseEditPart extends AbstractGraphicalEditPart imp
     public void deactivate() {
         if (isActive()) {
             doDeActivate();
+            ActionsInput input = getWidgetModel().getActionsInput();
+            for (AbstractWidgetAction a : input.getActionsList()) {
+                a.dispose();
+            }
             super.deactivate();
             // remove listener from all properties.
             for (String id : getWidgetModel().getAllPropertyIDs()) {
@@ -301,8 +312,13 @@ public abstract class AbstractBaseEditPart extends AbstractGraphicalEditPart imp
                 for (ScriptData scriptData : scriptDataList) {
                     ScriptService.getInstance().unRegisterScript(scriptData);
                 }
-                for (Object pv : pvMap.values().toArray()){
-                    ((IPV) pv).stop();
+                if (hasStartedPVs) {
+                    //this is just a guard statement
+                    //if the widget was deactivated before it became fully active (and connected its pv),
+                    //we should not attempt to stop those pvs; this can happen with linking container
+                    for (Object pv : pvMap.values().toArray()){
+                        ((IPV) pv).stop();
+                    }
                 }
             }
             propertyListenerMap.clear();
@@ -409,6 +425,7 @@ public abstract class AbstractBaseEditPart extends AbstractGraphicalEditPart imp
      * @return the external object. null if no such an object was set before.
      * @deprecated Use {@link #getVar(String)} instead.
      */
+    @Deprecated
     public synchronized Object getExternalObject(String name) {
         return getVar(name);
     }
@@ -478,26 +495,16 @@ public abstract class AbstractBaseEditPart extends AbstractGraphicalEditPart imp
         if (getWidgetModel().isEnabled() && actions != null) {
             figure.setCursor(Cursors.HAND);
             figure.addMouseListener(new MouseListener.Stub() {
-
                 @Override
                 public void mousePressed(MouseEvent me) {
                     if (me.button != 1)
                         return;
                     for (AbstractWidgetAction action : actions) {
-                        if (action instanceof AbstractOpenOPIAction) {
-                            ((AbstractOpenOPIAction) action)
-                                    .setCtrlPressed(false);
-                            ((AbstractOpenOPIAction) action)
-                                    .setShiftPressed(false);
-                            if (me.getState() == SWT.CONTROL) {
-                                ((AbstractOpenOPIAction) action)
-                                        .setCtrlPressed(true);
-                            } else if (me.getState() == SWT.SHIFT) {
-                                ((AbstractOpenOPIAction) action)
-                                        .setShiftPressed(true);
-                            }
-                        }
-                        action.run();
+                        if (action instanceof OpenDisplayAction)
+                            ((OpenDisplayAction) action).runWithModifiers((me.getState() & SWT.CONTROL) != 0,
+                                                                          (me.getState() & SWT.SHIFT) != 0);
+                        else
+                            action.run();
                     }
                 }
             });
@@ -768,6 +775,7 @@ public abstract class AbstractBaseEditPart extends AbstractGraphicalEditPart imp
      * @deprecated use {@link #setVar(String, Object)} instead.
      *
      */
+    @Deprecated
     public synchronized void setExternalObject(String name, Object var) {
         setVar(name, var);
     }

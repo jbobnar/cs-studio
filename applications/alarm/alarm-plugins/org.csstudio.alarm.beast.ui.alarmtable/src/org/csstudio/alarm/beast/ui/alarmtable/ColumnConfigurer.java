@@ -1,19 +1,25 @@
 package org.csstudio.alarm.beast.ui.alarmtable;
 
+import java.text.SimpleDateFormat;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 
+import org.eclipse.jface.dialogs.IDialogConstants;
 import org.eclipse.jface.dialogs.TitleAreaDialog;
 import org.eclipse.jface.resource.ImageRegistry;
 import org.eclipse.jface.viewers.CellLabelProvider;
+import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredContentProvider;
 import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerCell;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.ModifyEvent;
+import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.SelectionEvent;
@@ -26,28 +32,30 @@ import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Text;
+import org.eclipse.ui.plugin.AbstractUIPlugin;
 
 /**
  *
- * <code>ColumnConfigurer</code> is a dialog that allows to configure the visibility
- * of table columns as well as their order of appearance in the table.
+ * <code>ColumnConfigurer</code> is a dialog that allows to configure the visibility of table columns as well as their
+ * order of appearance in the table.
  *
  * @author <a href="mailto:jaka.bobnar@cosylab.com">Jaka Bobnar</a>
  *
  */
 public class ColumnConfigurer extends TitleAreaDialog {
 
-    private static final String LEFT = "Back24.gif";
-    private static final String RIGHT = "Forward24.gif";
-    private static final String UP = "Up24.gif";
-    private static final String DOWN = "Down24.gif";
+    private static final String LEFT = "Back24.gif"; //$NON-NLS-1$
+    private static final String RIGHT = "Forward24.gif"; //$NON-NLS-1$
+    private static final String UP = "Up24.gif"; //$NON-NLS-1$
+    private static final String DOWN = "Down24.gif"; //$NON-NLS-1$
     private static final ImageRegistry IMAGES = new ImageRegistry(Display.getDefault());
     static {
-        String ICONS = "icons/";
-        IMAGES.put(LEFT, Activator.imageDescriptorFromPlugin(Activator.ID, ICONS + LEFT));
-        IMAGES.put(RIGHT, Activator.imageDescriptorFromPlugin(Activator.ID, ICONS + RIGHT));
-        IMAGES.put(UP, Activator.imageDescriptorFromPlugin(Activator.ID, ICONS + UP));
-        IMAGES.put(DOWN, Activator.imageDescriptorFromPlugin(Activator.ID, ICONS + DOWN));
+        String ICONS = "icons/"; //$NON-NLS-1$
+        IMAGES.put(LEFT, AbstractUIPlugin.imageDescriptorFromPlugin(Activator.ID, ICONS + LEFT));
+        IMAGES.put(RIGHT, AbstractUIPlugin.imageDescriptorFromPlugin(Activator.ID, ICONS + RIGHT));
+        IMAGES.put(UP, AbstractUIPlugin.imageDescriptorFromPlugin(Activator.ID, ICONS + UP));
+        IMAGES.put(DOWN, AbstractUIPlugin.imageDescriptorFromPlugin(Activator.ID, ICONS + DOWN));
     }
 
     private static class ContentProvider implements IStructuredContentProvider {
@@ -71,7 +79,8 @@ public class ColumnConfigurer extends TitleAreaDialog {
         @Override
         public void update(ViewerCell cell) {
             ColumnWrapper cw = (ColumnWrapper) cell.getElement();
-            cell.setText(cw.getColumnInfo().getTitle());
+            String name = cw.getName();
+            cell.setText(name == null || name.isEmpty() ? cw.getColumnInfo().name() : name);
         }
 
     };
@@ -82,8 +91,17 @@ public class ColumnConfigurer extends TitleAreaDialog {
     private Button rightButton;
     private Button upButton;
     private Button downButton;
+    private Text timeFormatField;
+    private Text widthField;
+    private Text weightField;
+
+    private Button okButton;
 
     private final ColumnWrapper[] columns;
+    private String timeFormat = null;
+
+    private final boolean showFormatField;
+    private final boolean showWidthAndWeightFields;
 
     /**
      * Constructs a new configurer.
@@ -91,10 +109,17 @@ public class ColumnConfigurer extends TitleAreaDialog {
      * @param parentShell the parent window
      * @param columns the columns that will be manipulated
      */
-    public ColumnConfigurer(Shell parentShell, ColumnWrapper[] columns) {
+    public ColumnConfigurer(Shell parentShell, ColumnWrapper[] columns, String timeFormat,
+            boolean showFormatField, boolean showWidthAndWeightFields) {
         super(parentShell);
+        if (showFormatField && showWidthAndWeightFields) {
+            throw new IllegalArgumentException("Cannot show format field at the same time as width and weight.");
+        }
+        this.showFormatField = showFormatField;
+        this.showWidthAndWeightFields = showWidthAndWeightFields;
         setShellStyle(getShellStyle() | SWT.RESIZE);
         this.columns = columns;
+        this.timeFormat = timeFormat;
     }
 
     /**
@@ -102,6 +127,22 @@ public class ColumnConfigurer extends TitleAreaDialog {
      */
     public ColumnWrapper[] getColumns() {
         return columns;
+    }
+
+    /**
+     * @return the time format specified in the dialog
+     */
+    public String getTimeFormat() {
+        return timeFormat;
+    }
+
+    @Override
+    protected Button createButton(Composite parent, int id, String label, boolean defaultButton) {
+        Button b = super.createButton(parent, id, label, defaultButton);
+        if (id == IDialogConstants.OK_ID) {
+            okButton = b;
+        }
+        return b;
     }
 
     @SuppressWarnings("unchecked")
@@ -115,6 +156,9 @@ public class ColumnConfigurer extends TitleAreaDialog {
         }
         for (ColumnWrapper cw : hidden) {
             columns[i++] = cw;
+        }
+        if (showFormatField) {
+            timeFormat = timeFormatField.getText();
         }
         super.okPressed();
     }
@@ -132,11 +176,13 @@ public class ColumnConfigurer extends TitleAreaDialog {
         setTitle(Messages.ColumnConfigTitle);
         setMessage(Messages.ColumnConfigDescription);
         Composite base = new Composite(composite, SWT.NONE);
-        base.setLayout(new GridLayout(2, true));
+        GridLayout layout = new GridLayout(2, true);
+        layout.marginHeight = 0;
+        base.setLayout(layout);
         base.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
         Composite left = new Composite(base, SWT.NONE);
-        GridLayout layout = new GridLayout(2, false);
+        layout = new GridLayout(2, false);
         layout.marginWidth = 0;
         left.setLayout(layout);
         left.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
@@ -210,6 +256,25 @@ public class ColumnConfigurer extends TitleAreaDialog {
                 moveLeftRight(false);
             }
         });
+        shownList.addSelectionChangedListener(new ISelectionChangedListener() {
+            @Override
+            public void selectionChanged(SelectionChangedEvent event) {
+                if (showWidthAndWeightFields) {
+                    Object obj = ((IStructuredSelection)event.getSelection()).getFirstElement();
+                    if (obj instanceof ColumnWrapper) {
+                        widthField.setText(String.valueOf(((ColumnWrapper)obj).getMinWidth()));
+                        weightField.setText(String.valueOf(((ColumnWrapper)obj).getWeight()));
+                        widthField.setEnabled(true);
+                        weightField.setEnabled(true);
+                    } else {
+                        widthField.setText("");
+                        weightField.setText("");
+                        widthField.setEnabled(false);
+                        weightField.setEnabled(false);
+                    }
+                }
+            }
+        });
 
         Composite upDown = new Composite(right, SWT.NONE);
         upDown.setLayout(new GridLayout(1, true));
@@ -257,8 +322,134 @@ public class ColumnConfigurer extends TitleAreaDialog {
 
         updateTables();
 
+        if (showFormatField) {
+            createTimeFormatPanel(base);
+        }
+        if (showWidthAndWeightFields) {
+            createWidthAndWeightPanel(right);
+            Composite c = new Composite(left, SWT.NONE);
+            data = new GridData(SWT.FILL, SWT.TOP, true, false, 2, 1);
+            data.heightHint = 63;
+            c.setLayoutData(data);
+        }
         return composite;
 
+    }
+
+    private void createWidthAndWeightPanel(Composite base) {
+        Composite widthAndWeightPanel = new Composite(base, SWT.NONE);
+        GridData data = new GridData(SWT.FILL, SWT.TOP, true, false, 1, 1);
+        data.heightHint = 63;
+        widthAndWeightPanel.setLayoutData(data);
+        GridLayout layout = new GridLayout(2, false);
+        layout.marginHeight = 0;
+        layout.verticalSpacing = 3;
+        layout.marginRight = 0;
+        layout.marginWidth = 0;
+        widthAndWeightPanel.setLayout(layout);
+
+        Label widthLabel = new Label(widthAndWeightPanel, SWT.NONE);
+        widthLabel.setText(Messages.WidthLabel);
+        widthLabel.setLayoutData(new GridData(SWT.RIGHT, SWT.CENTER, true, false, 1, 1));
+
+        widthField = new Text(widthAndWeightPanel, SWT.BORDER);
+        data = new GridData(SWT.RIGHT, SWT.CENTER, false, false, 1, 1);
+        data.widthHint = 80;
+        widthField.setLayoutData(data);
+        widthField.addModifyListener(new ModifyListener() {
+            @Override
+            public void modifyText(ModifyEvent e) {
+                if (checkButtons()) {
+                    IStructuredSelection selection = (IStructuredSelection)shownList.getSelection();
+                    Object obj = selection.getFirstElement();
+                    if (obj instanceof ColumnWrapper) {
+                        ((ColumnWrapper)obj).setMinWidth(Integer.parseInt(widthField.getText()));
+                    }
+                }
+            }
+        });
+
+        Label weightLabel = new Label(widthAndWeightPanel, SWT.NONE);
+        weightLabel.setText(Messages.WeightLabel);
+        weightLabel.setLayoutData(new GridData(SWT.RIGHT, SWT.CENTER, true, false, 1, 1));
+
+        weightField = new Text(widthAndWeightPanel, SWT.BORDER);
+        data = new GridData(SWT.RIGHT, SWT.CENTER, false, false, 1, 1);
+        data.widthHint = 80;
+        weightField.setLayoutData(data);
+        weightField.addModifyListener(new ModifyListener() {
+            @Override
+            public void modifyText(ModifyEvent e) {
+                if (checkButtons()) {
+                    IStructuredSelection selection = (IStructuredSelection)shownList.getSelection();
+                    Object obj = selection.getFirstElement();
+                    if (obj instanceof ColumnWrapper) {
+                        ((ColumnWrapper)obj).setWeight(Integer.parseInt(weightField.getText()));
+                    }
+                }
+            }
+        });
+    }
+
+    private boolean checkButtons() {
+        String weight = weightField.getText();
+        String width = widthField.getText();
+        try {
+            // try to convert
+            int wi = Integer.parseInt(width);
+            int we = Integer.parseInt(weight);
+            if (okButton != null) {
+                boolean b = wi > 0 && we > -1;
+                okButton.setEnabled(b);
+                return b;
+            }
+        } catch (Exception ex) {
+            if (okButton != null)
+                okButton.setEnabled(false);
+        }
+        return false;
+    }
+
+    private void createTimeFormatPanel(Composite base) {
+        Composite timeFormatComposite = new Composite(base, SWT.NONE);
+        GridData data = new GridData(SWT.FILL, SWT.TOP, true, false, 2, 1);
+        data.heightHint = 30;
+        timeFormatComposite.setLayoutData(data);
+        GridLayout layout = new GridLayout(2, false);
+        layout.marginHeight = 0;
+        layout.verticalSpacing = 0;
+        layout.marginRight = 40;
+        timeFormatComposite.setLayout(layout);
+
+        Label timeFormatLabel = new Label(timeFormatComposite, SWT.NONE);
+        timeFormatLabel.setText(Messages.DateAndTimeFormat);
+        timeFormatLabel.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false, 1, 1));
+        timeFormatField = new Text(timeFormatComposite, SWT.BORDER);
+        timeFormatField.setText(timeFormat == null ? "" : timeFormat); //$NON-NLS-1$
+        timeFormatField.setToolTipText(Messages.DateAndTimeFormatTooltip);
+        data = new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1);
+        data.widthHint = 180;
+        timeFormatField.setLayoutData(data);
+        timeFormatField.addModifyListener(new ModifyListener() {
+            @Override
+            public void modifyText(ModifyEvent e) {
+                String text = timeFormatField.getText();
+                if (text.isEmpty()) {
+                    if (okButton != null)
+                        okButton.setEnabled(true);
+                } else {
+                    try {
+                        // try to convert
+                        new SimpleDateFormat(text);
+                        if (okButton != null)
+                            okButton.setEnabled(true);
+                    } catch (Exception ex) {
+                        if (okButton != null)
+                            okButton.setEnabled(false);
+                    }
+                }
+            }
+        });
     }
 
     private void moveLeftRight(boolean right) {

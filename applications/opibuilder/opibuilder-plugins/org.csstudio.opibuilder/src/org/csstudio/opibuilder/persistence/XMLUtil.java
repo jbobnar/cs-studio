@@ -465,14 +465,21 @@ public class XMLUtil {
             IPath path = container.getOPIFilePath();
             if(path != null && !path.isEmpty()) {
                 final DisplayModel inside = new DisplayModel(path);
+                inside.setDisplayID(container.getRootDisplayModel(false).getDisplayID());
 
-                fillDisplayModelFromInputStreamSub(ResourceUtil.pathToInputStream(path), inside, Display.getCurrent(), trace);
+                try
+                {
+                    fillDisplayModelFromInputStreamSub(ResourceUtil.pathToInputStream(path), inside, Display.getCurrent(), trace);
+                }
+                catch (Exception ex)
+                {
+                    OPIBuilderPlugin.getLogger().log(Level.WARNING, "Failed to load LinkingContainer opi_file " + path, ex);
+                }
 
                 // mark connection as it is loaded from linked opi
                 for(AbstractWidgetModel w : inside.getAllDescendants())
                     for(ConnectionModel conn : w.getSourceConnections())
                         conn.setLoadedFromLinkedOpi(true);
-
 
                 AbstractContainerModel loadTarget = inside;
 
@@ -484,8 +491,7 @@ public class XMLUtil {
                     }
                 }
 
-                for (AbstractWidgetModel w : loadTarget.getChildren())
-                    container.addChild(w, true);
+//                container.addChildren(loadTarget.getChildren(), true);
 
                 container.setDisplayModel(inside);
             }
