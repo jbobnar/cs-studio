@@ -305,7 +305,7 @@ public class WaveformSnapshotViewer {
                 if (trace == null) {
                     WaveformValueDataProvider dataProvider = new WaveformValueDataProvider();
                     dataProvider.setValue(data);
-                    trace = plot.addTrace(item.getResolvedDisplayName(), dataProvider, item.getColor(),
+                    trace = plot.addTrace(item.getResolvedDisplayName(),item.getUnits(), dataProvider, item.getColor(),
                             item.getTraceType(), item.getLineWidth(), item.getPointType(), item.getPointSize(),
                             item.getAxisIndex());
                     itemTraceMap.put(item, trace);
@@ -403,7 +403,7 @@ public class WaveformSnapshotViewer {
                     retrieveSample(item, currentTimestamp);
                 } else {
                     WaveformValueDataProvider dataProvider = new WaveformValueDataProvider();
-                    Trace<Double> trace = plot.addTrace(item.getResolvedDisplayName(), dataProvider, item.getColor(),
+                    Trace<Double> trace = plot.addTrace(item.getResolvedDisplayName(), item.getUnits(), dataProvider, item.getColor(),
                             item.getTraceType(), item.getLineWidth(), item.getPointType(), item.getPointSize(),
                             item.getAxisIndex());
                     itemTraceMap.put(item, trace);
